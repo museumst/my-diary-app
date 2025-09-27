@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Edit3, Check, X, LogIn, LogOut, User, Image } from 'lucide-react';
+import { Calendar, Edit3, Check, X, Image } from 'lucide-react';
 
 const DiaryBoard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
