@@ -14,28 +14,6 @@ import { db } from '../firebase';
 // 사용자별 일기 데이터 경로: users/{userId}/posts/{date}
 // 각 날짜별로 문서 하나, 그 안에 posts 배열로 여러 글 저장
 
-// 일기 추가 함수 수정 (imageUrl 인자 추가)
-export const addPostToDate = async (userId, date, content, imageUrl = null) => {
-    try {
-        const docRef = doc(db, 'users', userId, 'posts', date);
-        
-        // 기존 데이터를 가져와서 새로운 데이터와 병합 (배열에 새 일기 추가)
-        // 이 부분은 사용자님의 기존 데이터 구조에 따라 달라질 수 있습니다.
-        const newPost = {
-            id: Date.now(),
-            content: content,
-            imageUrl: imageUrl, // 🚨 이미지 URL 저장 필드 추가
-            createdAt: new Date()
-        };
-        
-        // Firestore에 데이터 저장 (기존 배열에 추가하는 로직)
-        // ...
-        
-    } catch (error) {
-        console.error("Error adding post:", error);
-        throw error;
-    }
-};
 
 // 특정 날짜의 일기 데이터 가져오기
 export const getPostsForDate = async (userId, date) => {
