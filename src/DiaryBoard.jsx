@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Check, X, Image } from 'lucide-react';
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
-import { 
-  getPostsForDate, 
+import {  
   addPostToDate, 
   updatePostInDate, 
   deletePostFromDate, 
