@@ -732,9 +732,9 @@ const DiaryBoard = () => {
                 </div>
               )}
               {/* Firebase 연결 상태 표시 */}
-              <div className="text-xs text-gray-400 mt-1">
-                {firebaseConnected ? '🟢 Firebase 연결됨' : '🟡 데모 모드'}
-              </div>
+//              <div className="text-xs text-gray-400 mt-1">
+//                {firebaseConnected ? '🟢 Firebase 연결됨' : '🟡 데모 모드'}
+//              </div>
             </div>
             <div className="flex gap-2">
               <button
