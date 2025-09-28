@@ -4,7 +4,7 @@ import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getError
 import {  
   addPostToDate, 
   updatePostInDate, 
-  deletePostFromDate, 
+  // deletePostFromDate, 
   subscribeToUserPosts 
 } from './services/firestoreService';
 
