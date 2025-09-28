@@ -7,6 +7,7 @@ import {
   // deletePostFromDate, 
   subscribeToUserPosts 
 } from './services/firestoreService';
+import { uploadImage } from './services/storageService';
 
 const DiaryBoard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -27,6 +28,8 @@ const DiaryBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
+  // 🚨 1. Storage 업로드용 파일 상태 추가
+  const [selectedFile, setSelectedFile] = useState(null); 
 
   // Firebase 연결 확인
   useEffect(() => {
@@ -71,6 +74,17 @@ const DiaryBoard = () => {
       }
     }
   }, [user, firebaseConnected]);
+
+  // 🚨 2. 파일 변경 핸들러 함수 추가
+  const handleFileChange = (event) => {
+    // 사용자가 선택한 파일(첫 번째 파일)을 selectedFile에 저장
+    if (event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
@@ -158,14 +172,28 @@ const DiaryBoard = () => {
     }
 
     if (isWriting) {
-      if (newPost.trim() || newPostImages.length > 0) {
+      // 🚨 Storage 파일 상태(selectedFile) 체크 로직 추가
+      if (newPost.trim() || newPostImages.length > 0 || selectedFile) { 
         try {
           setIsLoading(true);
           const postId = Date.now().toString();
+
+          let storageImageUrl = null;
+          let finalImages = newPostImages; // 기본값은 Base64 이미지 (데모 모드용)
+
+          // 🚨 Firebase 연결 시 Storage 업로드 로직 추가
+          if (firebaseConnected && selectedFile) {
+              console.log("Firebase Storage에 이미지 업로드를 시작합니다...");
+              storageImageUrl = await uploadImage(user.uid, selectedFile);
+              // Storage 사용 시 Base64 이미지는 저장하지 않음 (고용량 파일 우선)
+              finalImages = [];
+          }
+
           const newPostData = {
             id: postId,
             content: newPost.trim(),
-            images: newPostImages,
+            images: finalImages, // 데모 모드용 Base64 이미지 또는 빈 배열
+            storageImageUrl: storageImageUrl, // 🚨 Storage URL 필드 추가
             createdAt: new Date().toLocaleTimeString(),
             author: user.email
           };
@@ -173,6 +201,7 @@ const DiaryBoard = () => {
           if (firebaseConnected) {
             await addPostToDate(user.uid, selectedDate, newPostData);
           } else {
+            // 데모 모드에서는 여전히 Base64 이미지를 사용
             const newPosts = {
               ...posts,
               [selectedDate]: [
@@ -185,6 +214,7 @@ const DiaryBoard = () => {
           
           setNewPost('');
           setNewPostImages([]);
+          setSelectedFile(null); // 🚨 파일 상태 초기화
         } catch (error) {
           console.error('Error adding post:', error);
           setLoginError('글 저장 중 오류가 발생했습니다.');
@@ -262,7 +292,7 @@ const DiaryBoard = () => {
 
   // 텍스트가 길거나 이미지가 있는지 확인
   const shouldShowMoreButton = (post) => {
-    const hasImages = post.images && post.images.length > 0;
+    const hasImages = (post.images && post.images.length > 0) || post.storageImageUrl;
     const hasLongText = post.content.length > 200;
     return hasImages || hasLongText;
   };
@@ -368,7 +398,7 @@ const DiaryBoard = () => {
     });
   };
 
-  // 이미지 추가
+  // 이미지 추가 (Base64)
   const handleImageAdd = async (event) => {
     const files = Array.from(event.target.files);
     const imagePromises = files.map(async (file) => {
@@ -731,11 +761,10 @@ const DiaryBoard = () => {
                   filtering by: {selectedTags.join(' ')}
                 </div>
               )}
-              {/* Firebase 연결 상태 표시 */}
+              {/* Firebase 연결 상태 표시 (🚨 문구 제거) */}
               {/* <div className="text-xs text-gray-400 mt-1">
-                  {firebaseConnected ? ' 🟢 Firebase 연결됨' : ' 🟡 데모 모드'}
-                </div>
-              */}
+                {firebaseConnected ? ' 🟢 Firebase 연결됨' : ' 🟡 데모 모드'}
+              </div> */}
             </div>
             <div className="flex gap-2">
               <button
@@ -783,7 +812,7 @@ const DiaryBoard = () => {
                 autoFocus
               />
 
-              {/* 이미지 미리보기 */}
+              {/* Base64 이미지 미리보기 */}
               {newPostImages.length > 0 && (
                 <div className="mb-3">
                   <div className="grid grid-cols-2 gap-2">
@@ -805,12 +834,27 @@ const DiaryBoard = () => {
                   </div>
                 </div>
               )}
+              
+              {/* 🚨 Storage 첨부 파일 미리보기 */}
+              {selectedFile && (
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Storage 첨부 파일:</p>
+                  <p className="text-sm text-blue-600">{selectedFile.name}</p>
+                  <button
+                    onClick={() => setSelectedFile(null)}
+                    className="mt-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    첨부 파일 취소
+                  </button>
+                </div>
+              )}
 
-              {/* 이미지 추가 버튼 */}
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors">
+              {/* 이미지 추가 버튼 영역 */}
+              <div className="flex items-center gap-4">
+                {/* 기존 Base64 이미지 추가 버튼 (데모 모드용) */}
+                <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors border rounded">
                   <Image className="w-4 h-4" />
-                  <span>image</span>
+                  <span>Base64 Image (데모용)</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -819,8 +863,22 @@ const DiaryBoard = () => {
                     className="hidden"
                   />
                 </label>
+
+                {/* 🚨 새로운 Storage 이미지 추가 버튼 (고용량 파일용) */}
+                <label className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 cursor-pointer transition-colors rounded">
+                  <Image className="w-4 h-4" />
+                  <span>고용량 이미지 (Storage)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange} // 🚨 새로 만든 함수 연결
+                    className="hidden"
+                  />
+                </label>
                 <span className="text-xs text-gray-400">
-                  {newPostImages.length > 0 && `${newPostImages.length} image(s) added`}
+                  {newPostImages.length > 0 && `Base64: ${newPostImages.length}개`}
+                  {selectedFile && (newPostImages.length > 0 ? ' / ' : '')}
+                  {selectedFile && `Storage: 1개`}
                 </span>
               </div>
             </div>
@@ -871,7 +929,7 @@ const DiaryBoard = () => {
                           autoFocus
                         />
 
-                        {/* 수정 중 이미지 미리보기 */}
+                        {/* 수정 중 Base64 이미지 미리보기 */}
                         {editImages.length > 0 && (
                           <div className="grid grid-cols-2 gap-2">
                             {editImages.map((image) => (
@@ -892,7 +950,7 @@ const DiaryBoard = () => {
                           </div>
                         )}
 
-                        {/* 수정 중 이미지 추가 */}
+                        {/* 수정 중 이미지 추가 (Base64) */}
                         <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
                           <Image className="w-4 h-4" />
                           <span>add image</span>
@@ -978,49 +1036,45 @@ const DiaryBoard = () => {
                         </div>
 
                         {/* 이미지 표시 */}
-                        {post.images && post.images.length > 0 && (
+                        {(post.images && post.images.length > 0) || post.storageImageUrl ? (
                           <div className="mt-3 w-full">
-                            {expandedPosts.has(post.id) ? (
-                              // 펼쳐진 상태: 모든 이미지를 세로로 배치, 원본 비율 유지
-                              <div className="w-full">
-                                {post.images.map((image, index) => (
-                                  <div key={image.id} className="mb-4 w-full">
+                              {/* 🚨 Storage 이미지 표시 로직 (가장 위에 표시) */}
+                              {post.storageImageUrl && (
+                                <div className="flex justify-center mb-4">
+                                  <div className="relative">
                                     <img
-                                      src={image.data}
-                                      alt={image.name}
-                                      className="block w-auto max-w-none rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                      style={{
-                                        display: 'block',
-                                        width: 'auto',
-                                        height: 'auto',
-                                        maxWidth: 'none',
-                                        maxHeight: 'none'
-                                      }}
-                                      onClick={() => window.open(image.data, '_blank')}
+                                      src={post.storageImageUrl}
+                                      alt="Storage Image"
+                                      className="max-w-full h-auto max-h-96 object-contain rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => window.open(post.storageImageUrl, '_blank')}
                                     />
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              // 접힌 상태: 첫 번째 이미지만 작게 표시
-                              <div className="flex justify-center">
-                                <div className="relative">
-                                  <img
-                                    src={post.images[0].data}
-                                    alt={post.images[0].name}
-                                    className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => window.open(post.images[0].data, '_blank')}
-                                  />
-                                  {post.images.length > 1 && (
-                                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-                                      +{post.images.length - 1} more
+                                    <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">
+                                      Storage Image
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
+
+                              {/* Base64 이미지 표시 (기존 로직 유지) */}
+                              {post.images && post.images.length > 0 && (
+                                <div className="flex justify-center">
+                                  <div className="relative">
+                                    <img
+                                      src={post.images[0].data}
+                                      alt={post.images[0].name}
+                                      className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => window.open(post.images[0].data, '_blank')}
+                                    />
+                                    {post.images.length > 1 && (
+                                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                                        +{post.images.length - 1} more (Base64)
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                           </div>
-                        )}
+                        ) : null}
 
                         {/* 더보기/접기 버튼 */}
                         {shouldShowMoreButton(post) && (
