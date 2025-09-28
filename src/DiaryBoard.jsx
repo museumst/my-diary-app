@@ -613,18 +613,18 @@ const DiaryBoard = () => {
                 {isLoading ? (isSignupMode ? '가입 중...' : '로그인 중...') : (isSignupMode ? '회원가입' : '로그인')}
               </button>
 
-              {/* 회원가입/로그인 전환 버튼 - 항상 표시 */ //삭제함}
+              {/* 회원가입/로그인 전환 버튼 - 항상 표시 */}
               <div className="text-center">
-                  <button
-                    onClick={() => {
-                      setIsSignupMode(!isSignupMode);
-                      setLoginError('');
-                    }}
-                    className="text-sm text-blue-500 hover:text-blue-600"
-                  >
-                    {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setIsSignupMode(!isSignupMode);
+                    setLoginError('');
+                  }}
+                  className="text-sm text-blue-500 hover:text-blue-600"
+                >
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
