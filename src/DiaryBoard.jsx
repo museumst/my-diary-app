@@ -229,7 +229,7 @@ const DiaryBoard = () => {
   };
 
   // 글 수정 시작
-  const startEdit = (postId, content, images = [], postDate = null) => {
+  const startEdit = (postId, content, images = [], postDate = null, storageImageUrl = null) => {
     if (!user) {
       setIsLoginModalOpen(true);
       return;
@@ -238,6 +238,7 @@ const DiaryBoard = () => {
     setEditText(content);
     setEditImages(images);
     setEditingDate(postDate || selectedDate);
+    // 참고: 수정 시 Storage 이미지 변경은 복잡하므로, 현재는 Base64 이미지(editImages)만 수정 가능하도록 유지합니다.
   };
 
   // 글 수정 완료
@@ -251,6 +252,7 @@ const DiaryBoard = () => {
         const updatedData = {
           content: editText.trim(),
           images: editImages
+          // Storage 이미지 변경은 별도로 처리해야 하므로, 기존 storageImageUrl은 유지됩니다.
         };
         await updatePostInDate(user.uid, editingDate, editingId, updatedData);
       } else {
@@ -292,6 +294,7 @@ const DiaryBoard = () => {
 
   // 텍스트가 길거나 이미지가 있는지 확인
   const shouldShowMoreButton = (post) => {
+    // 🚨 Storage 이미지 유무도 확인하도록 수정
     const hasImages = (post.images && post.images.length > 0) || post.storageImageUrl;
     const hasLongText = post.content.length > 200;
     return hasImages || hasLongText;
@@ -761,10 +764,12 @@ const DiaryBoard = () => {
                   filtering by: {selectedTags.join(' ')}
                 </div>
               )}
-              {/* Firebase 연결 상태 표시 (🚨 문구 제거) */}
-              {/* <div className="text-xs text-gray-400 mt-1">
+              {/* Firebase 연결 상태 표시 (주석 처리) */}
+              {/*
+              <div className="text-xs text-gray-400 mt-1">
                 {firebaseConnected ? ' 🟢 Firebase 연결됨' : ' 🟡 데모 모드'}
-              </div> */}
+              </div>
+              */}
             </div>
             <div className="flex gap-2">
               <button
@@ -950,10 +955,10 @@ const DiaryBoard = () => {
                           </div>
                         )}
 
-                        {/* 수정 중 이미지 추가 (Base64) */}
+                        {/* 수정 중 Base64 이미지 추가 */}
                         <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
                           <Image className="w-4 h-4" />
-                          <span>add image</span>
+                          <span>add image (Base64 only)</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -1026,7 +1031,7 @@ const DiaryBoard = () => {
                           </div>
                           {user && (
                             <button
-                              onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
+                              onClick={() => startEdit(post.id, post.content, post.images || [], post.date, post.storageImageUrl)}
                               className="ml-3 p-1 text-gray-400 hover:text-blue-500 transition-colors"
                               title="수정"
                             >
@@ -1035,7 +1040,7 @@ const DiaryBoard = () => {
                           )}
                         </div>
 
-                        {/* 이미지 표시 */}
+                        {/* 이미지 표시 (Base64 또는 Storage) */}
                         {(post.images && post.images.length > 0) || post.storageImageUrl ? (
                           <div className="mt-3 w-full">
                               {/* 🚨 Storage 이미지 표시 로직 (가장 위에 표시) */}
