@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Check, X, Image } from 'lucide-react';
+import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
+import { 
+  getPostsForDate, 
+  addPostToDate, 
+  updatePostInDate, 
+  deletePostFromDate, 
+  subscribeToUserPosts 
+} from './services/firestoreService';
 
 const DiaryBoard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -10,6 +18,7 @@ const DiaryBoard = () => {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const [editImages, setEditImages] = useState([]);
+  const [editingDate, setEditingDate] = useState(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
@@ -17,6 +26,227 @@ const DiaryBoard = () => {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
+
+  // Firebase 연결 확인
+  useEffect(() => {
+    try {
+      // Firebase 연결 테스트
+      const unsubscribe = subscribeToAuthState((user) => {
+        setUser(user);
+        setFirebaseConnected(true);
+        if (user) {
+          setIsLoginModalOpen(false);
+          setLoginError('');
+          setLoginForm({ email: '', password: '' });
+        } else {
+          setPosts({});
+        }
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.log('Firebase 연결 실패, 데모 모드로 실행');
+      setFirebaseConnected(false);
+      // 데모 모드용 사용자 복원
+      const savedUser = localStorage.getItem('diary_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    }
+  }, []);
+
+  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
+  useEffect(() => {
+    if (user && firebaseConnected) {
+      const unsubscribe = subscribeToUserPosts(user.uid, (newPosts) => {
+        setPosts(newPosts);
+      });
+      return () => unsubscribe();
+    } else if (user && !firebaseConnected) {
+      // 데모 모드용 데이터 로드
+      const userPostsKey = `diary_posts_${user.uid}`;
+      const userPosts = localStorage.getItem(userPostsKey);
+      if (userPosts) {
+        setPosts(JSON.parse(userPosts));
+      }
+    }
+  }, [user, firebaseConnected]);
+
+  // 로그인/회원가입 함수
+  const handleLogin = async (email, password) => {
+    setIsLoading(true);
+    setLoginError('');
+    
+    try {
+      if (firebaseConnected) {
+        // Firebase 모드
+        if (isSignupMode) {
+          await signupWithEmail(email, password);
+        } else {
+          await loginWithEmail(email, password);
+        }
+      } else {
+        // 데모 모드
+        if (isSignupMode) {
+          const existingUsers = JSON.parse(localStorage.getItem('diary_users') || '[]');
+          if (existingUsers.find(u => u.email === email)) {
+            throw new Error('이미 사용 중인 이메일입니다.');
+          }
+          if (password.length < 6) {
+            throw new Error('비밀번호는 6자 이상이어야 합니다.');
+          }
+          const newUser = { uid: Date.now().toString(), email };
+          existingUsers.push({ ...newUser, password });
+          localStorage.setItem('diary_users', JSON.stringify(existingUsers));
+          localStorage.setItem('diary_user', JSON.stringify(newUser));
+          setUser(newUser);
+        } else {
+          const existingUsers = JSON.parse(localStorage.getItem('diary_users') || '[]');
+          const foundUser = existingUsers.find(u => u.email === email && u.password === password);
+          if (!foundUser) {
+            throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
+          }
+          const loginUser = { uid: foundUser.uid, email: foundUser.email };
+          localStorage.setItem('diary_user', JSON.stringify(loginUser));
+          setUser(loginUser);
+        }
+        setIsLoginModalOpen(false);
+        setLoginForm({ email: '', password: '' });
+        setIsSignupMode(false);
+      }
+    } catch (error) {
+      if (firebaseConnected) {
+        setLoginError(getErrorMessage(error));
+      } else {
+        setLoginError(error.message);
+      }
+    }
+    setIsLoading(false);
+  };
+
+  // 로그아웃 함수
+  const handleLogout = async () => {
+    try {
+      if (firebaseConnected) {
+        await logout();
+      } else {
+        localStorage.removeItem('diary_user');
+        setUser(null);
+        setPosts({});
+      }
+      setIsWriting(false);
+      setEditingId(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // 데모 모드용 데이터 저장
+  const saveUserPosts = (newPosts) => {
+    if (user && !firebaseConnected) {
+      const userPostsKey = `diary_posts_${user.uid}`;
+      localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
+      setPosts(newPosts);
+    }
+  };
+
+  // 글 작성
+  const handleWrite = async () => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    if (isWriting) {
+      if (newPost.trim() || newPostImages.length > 0) {
+        try {
+          setIsLoading(true);
+          const postId = Date.now().toString();
+          const newPostData = {
+            id: postId,
+            content: newPost.trim(),
+            images: newPostImages,
+            createdAt: new Date().toLocaleTimeString(),
+            author: user.email
+          };
+          
+          if (firebaseConnected) {
+            await addPostToDate(user.uid, selectedDate, newPostData);
+          } else {
+            const newPosts = {
+              ...posts,
+              [selectedDate]: [
+                ...(posts[selectedDate] || []),
+                newPostData
+              ]
+            };
+            saveUserPosts(newPosts);
+          }
+          
+          setNewPost('');
+          setNewPostImages([]);
+        } catch (error) {
+          console.error('Error adding post:', error);
+          setLoginError('글 저장 중 오류가 발생했습니다.');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      setIsWriting(false);
+    } else {
+      setIsWriting(true);
+    }
+  };
+
+  // 글 수정 시작
+  const startEdit = (postId, content, images = [], postDate = null) => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setEditingId(postId);
+    setEditText(content);
+    setEditImages(images);
+    setEditingDate(postDate || selectedDate);
+  };
+
+  // 글 수정 완료
+  const completeEdit = async () => {
+    if (!user || !editingId || !editingDate) return;
+
+    try {
+      setIsLoading(true);
+      
+      if (firebaseConnected) {
+        const updatedData = {
+          content: editText.trim(),
+          images: editImages
+        };
+        await updatePostInDate(user.uid, editingDate, editingId, updatedData);
+      } else {
+        const newPosts = {
+          ...posts,
+          [editingDate]: posts[editingDate].map(post =>
+            post.id === editingId
+              ? { ...post, content: editText.trim(), images: editImages }
+              : post
+          )
+        };
+        saveUserPosts(newPosts);
+      }
+      
+      setEditingId(null);
+      setEditText('');
+      setEditImages([]);
+      setEditingDate(null);
+    } catch (error) {
+      console.error('Error updating post:', error);
+      setLoginError('글 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 게시글 펼치기/접기
   const toggleExpandPost = (postId) => {
@@ -43,7 +273,6 @@ const DiaryBoard = () => {
     return text
       .split('\n')
       .map((line, lineIndex) => {
-        // 헤딩 처리
         if (line.startsWith('### ')) {
           return (
             <h3 key={lineIndex} className="text-lg font-bold text-gray-900 mt-4 mb-2">
@@ -66,7 +295,6 @@ const DiaryBoard = () => {
           );
         }
         
-        // 리스트 처리
         if (line.startsWith('- ') || line.startsWith('* ')) {
           return (
             <li key={lineIndex} className="ml-4 list-disc text-gray-800">
@@ -75,12 +303,10 @@ const DiaryBoard = () => {
           );
         }
         
-        // 빈 줄
         if (line.trim() === '') {
           return <br key={lineIndex} />;
         }
         
-        // 일반 텍스트
         return (
           <p key={lineIndex} className="text-gray-800 leading-relaxed mb-2">
             {processInlineMarkdown(line)}
@@ -89,12 +315,11 @@ const DiaryBoard = () => {
       });
   };
 
-  // 인라인 마크다운 처리 (굵게, 기울임, 해시태그)
+  // 인라인 마크다운 처리
   const processInlineMarkdown = (text) => {
     const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g);
     
     return parts.map((part, index) => {
-      // 해시태그
       if (part.match(/^#[\w가-힣]+$/)) {
         return (
           <span key={index} className="text-blue-600 font-medium">
@@ -102,7 +327,6 @@ const DiaryBoard = () => {
           </span>
         );
       }
-      // 굵게 (**)
       if (part.startsWith('**') && part.endsWith('**')) {
         return (
           <strong key={index} className="font-bold">
@@ -110,7 +334,6 @@ const DiaryBoard = () => {
           </strong>
         );
       }
-      // 굵게 (__)
       if (part.startsWith('__') && part.endsWith('__')) {
         return (
           <strong key={index} className="font-bold">
@@ -118,7 +341,6 @@ const DiaryBoard = () => {
           </strong>
         );
       }
-      // 기울임 (*)
       if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
         return (
           <em key={index} className="italic">
@@ -126,7 +348,6 @@ const DiaryBoard = () => {
           </em>
         );
       }
-      // 기울임 (_)
       if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
         return (
           <em key={index} className="italic">
@@ -162,7 +383,7 @@ const DiaryBoard = () => {
       }
       return null;
     });
-    
+
     const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
     setNewPostImages(prev => [...prev, ...newImages]);
   };
@@ -197,15 +418,17 @@ const DiaryBoard = () => {
 
   // 해시태그로 필터링된 글 목록
   const getFilteredPosts = () => {
+    const selectedPosts = posts[selectedDate] || [];
+    
     if (selectedTags.length === 0) {
       return selectedPosts;
     }
-    
+
     const allFilteredPosts = [];
     Object.entries(posts).forEach(([date, dayPosts]) => {
       dayPosts.forEach(post => {
         const postTags = extractHashtags(post.content);
-        const hasAllSelectedTags = selectedTags.every(selectedTag => 
+        const hasAllSelectedTags = selectedTags.every(selectedTag =>
           postTags.some(postTag => postTag === selectedTag)
         );
         if (hasAllSelectedTags) {
@@ -216,41 +439,18 @@ const DiaryBoard = () => {
         }
       });
     });
-    
+
     return allFilteredPosts;
   };
 
   // 해시태그 선택/해제
   const toggleTag = (tag) => {
     setSelectedTags(prev => {
-      const newTags = prev.includes(tag) 
+      const newTags = prev.includes(tag)
         ? prev.filter(t => t !== tag)
         : [...prev, tag];
       return newTags;
     });
-  };
-
-  // 모의 로그인 함수
-  const handleLogin = async (email, password) => {
-    setIsLoading(true);
-    setLoginError('');
-    
-    if (email === 'admin@example.com' && password === 'password123') {
-      const mockUser = { uid: '123', email: email };
-      setUser(mockUser);
-      setIsLoginModalOpen(false);
-      setLoginForm({ email: '', password: '' });
-    } else {
-      setLoginError('이메일 또는 비밀번호가 올바르지 않습니다.');
-    }
-    setIsLoading(false);
-  };
-
-  // 로그아웃 함수
-  const handleLogout = () => {
-    setUser(null);
-    setIsWriting(false);
-    setEditingId(null);
   };
 
   // 달력 생성을 위한 함수들
@@ -288,66 +488,6 @@ const DiaryBoard = () => {
     });
   };
 
-  // 글 작성
-  const handleWrite = () => {
-    if (!user) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-
-    if (isWriting) {
-      if (newPost.trim() || newPostImages.length > 0) {
-        const postId = Date.now().toString();
-        setPosts(prev => ({
-          ...prev,
-          [selectedDate]: [
-            ...(prev[selectedDate] || []),
-            {
-              id: postId,
-              content: newPost.trim(),
-              images: newPostImages,
-              createdAt: new Date().toLocaleTimeString(),
-              author: user.email
-            }
-          ]
-        }));
-        setNewPost('');
-        setNewPostImages([]);
-      }
-      setIsWriting(false);
-    } else {
-      setIsWriting(true);
-    }
-  };
-
-  // 글 수정 시작
-  const startEdit = (postId, content, images = []) => {
-    if (!user) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-    setEditingId(postId);
-    setEditText(content);
-    setEditImages(images);
-  };
-
-  // 글 수정 완료
-  const completeEdit = () => {
-    if (editText.trim() || editImages.length > 0) {
-      setPosts(prev => ({
-        ...prev,
-        [selectedDate]: prev[selectedDate].map(post =>
-          post.id === editingId
-            ? { ...post, content: editText.trim(), images: editImages }
-            : post
-        )
-      }));
-    }
-    setEditingId(null);
-    setEditText('');
-    setEditImages([]);
-  };
-
   // 달력 렌더링
   const renderCalendar = () => {
     const daysInMonth = getDaysInMonth(currentMonth.year, currentMonth.month);
@@ -370,8 +510,8 @@ const DiaryBoard = () => {
           onClick={() => setSelectedDate(dateStr)}
           className={`
             h-10 w-10 text-sm font-medium transition-all duration-200 relative
-            ${isSelected 
-              ? 'bg-black text-white' 
+            ${isSelected
+              ? 'bg-black text-white'
               : isToday
                 ? 'bg-gray-100 text-black hover:bg-gray-200'
                 : 'hover:bg-gray-50'
@@ -409,18 +549,21 @@ const DiaryBoard = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-96">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">로그인</h3>
-              <button 
+              <h3 className="text-lg font-semibold">
+                {isSignupMode ? '회원가입' : '로그인'}
+              </h3>
+              <button
                 onClick={() => {
                   setIsLoginModalOpen(false);
                   setLoginError('');
+                  setIsSignupMode(false);
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -431,10 +574,10 @@ const DiaryBoard = () => {
                   value={loginForm.email}
                   onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="admin@example.com"
+                  placeholder="your-email@example.com"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   비밀번호
@@ -444,7 +587,7 @@ const DiaryBoard = () => {
                   value={loginForm.password}
                   onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="password123"
+                  placeholder={isSignupMode ? "6자 이상 입력하세요" : "비밀번호"}
                 />
               </div>
 
@@ -454,19 +597,35 @@ const DiaryBoard = () => {
                 </div>
               )}
 
-              <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
-                <p><strong>데모 계정:</strong></p>
-                <p>이메일: admin@example.com</p>
-                <p>비밀번호: password123</p>
-              </div>
+              {/* 데모 계정 정보 (데모 모드일 때만 표시) */}
+              {!firebaseConnected && !isSignupMode && (
+                <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
+                  <p><strong>데모 계정:</strong></p>
+                  <p>이메일: admin@example.com</p>
+                  <p>비밀번호: password123</p>
+                </div>
+              )}
 
               <button
                 onClick={() => handleLogin(loginForm.email, loginForm.password)}
                 disabled={isLoading}
                 className="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isLoading ? '로그인 중...' : '로그인'}
+                {isLoading ? (isSignupMode ? '가입 중...' : '로그인 중...') : (isSignupMode ? '회원가입' : '로그인')}
               </button>
+
+              {/* 회원가입/로그인 전환 버튼 - 항상 표시 */}
+              <div className="text-center">
+                <button
+                  onClick={() => {
+                    setIsSignupMode(!isSignupMode);
+                    setLoginError('');
+                  }}
+                  className="text-sm text-blue-500 hover:text-blue-600"
+                >
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -477,7 +636,7 @@ const DiaryBoard = () => {
         <div className="w-full">
           {/* 달력 헤더 */}
           <div className="flex items-center justify-between mb-6">
-            <button 
+            <button
               onClick={() => changeMonth(-1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -503,7 +662,7 @@ const DiaryBoard = () => {
                 ))}
               </select>
             </div>
-            <button 
+            <button
               onClick={() => changeMonth(1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -573,16 +732,20 @@ const DiaryBoard = () => {
                   filtering by: {selectedTags.join(' ')}
                 </div>
               )}
+              {/* Firebase 연결 상태 표시 */}
+              <div className="text-xs text-gray-400 mt-1">
+                {firebaseConnected ? '🟢 Firebase 연결됨' : '🟡 데모 모드'}
+              </div>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleWrite}
                 className={`
                   px-3 py-1 text-sm font-medium transition-all duration-200 text-white
-                  ${!user 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : isWriting 
-                      ? 'bg-black hover:bg-gray-800' 
+                  ${!user
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : isWriting
+                      ? 'bg-black hover:bg-gray-800'
                       : 'bg-black hover:bg-gray-800'
                   }
                 `}
@@ -590,7 +753,7 @@ const DiaryBoard = () => {
               >
                 {isWriting ? 'done' : '+'}
               </button>
-              
+
               {user ? (
                 <button
                   onClick={handleLogout}
@@ -619,15 +782,15 @@ const DiaryBoard = () => {
                 className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                 autoFocus
               />
-              
+
               {/* 이미지 미리보기 */}
               {newPostImages.length > 0 && (
                 <div className="mb-3">
                   <div className="grid grid-cols-2 gap-2">
                     {newPostImages.map((image) => (
                       <div key={image.id} className="relative">
-                        <img 
-                          src={image.data} 
+                        <img
+                          src={image.data}
                           alt={image.name}
                           className="w-full h-32 object-cover rounded border"
                         />
@@ -642,7 +805,7 @@ const DiaryBoard = () => {
                   </div>
                 </div>
               )}
-              
+
               {/* 이미지 추가 버튼 */}
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors">
@@ -707,14 +870,14 @@ const DiaryBoard = () => {
                           className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
-                        
+
                         {/* 수정 중 이미지 미리보기 */}
                         {editImages.length > 0 && (
                           <div className="grid grid-cols-2 gap-2">
                             {editImages.map((image) => (
                               <div key={image.id} className="relative">
-                                <img 
-                                  src={image.data} 
+                                <img
+                                  src={image.data}
                                   alt={image.name}
                                   className="w-full h-32 object-cover rounded border"
                                 />
@@ -728,7 +891,7 @@ const DiaryBoard = () => {
                             ))}
                           </div>
                         )}
-                        
+
                         {/* 수정 중 이미지 추가 */}
                         <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
                           <Image className="w-4 h-4" />
@@ -743,7 +906,7 @@ const DiaryBoard = () => {
                                 if (file.type.startsWith('image/')) {
                                   const base64 = await convertToBase64(file);
                                   return {
-                                    id: Date.now() + Math.random(),
+                                    id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
                                     name: file.name,
                                     data: base64
                                   };
@@ -756,7 +919,7 @@ const DiaryBoard = () => {
                             className="hidden"
                           />
                         </label>
-                        
+
                         <div className="flex gap-2">
                           <button
                             onClick={completeEdit}
@@ -769,6 +932,7 @@ const DiaryBoard = () => {
                               setEditingId(null);
                               setEditText('');
                               setEditImages([]);
+                              setEditingDate(null);
                             }}
                             className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition-colors"
                           >
@@ -781,7 +945,7 @@ const DiaryBoard = () => {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
                             {/* 텍스트 표시 - 마크다운과 줄바꿈 적용 */}
-                            <div 
+                            <div
                               className="text-gray-800 leading-relaxed"
                               style={{
                                 ...(!expandedPosts.has(post.id) && post.content.length > 200 && {
@@ -794,7 +958,7 @@ const DiaryBoard = () => {
                             >
                               {renderMarkdownText(post.content)}
                             </div>
-                            
+
                             {/* 태그 필터링 시 날짜 표시 */}
                             {selectedTags.length > 0 && post.date && (
                               <p className="text-xs text-gray-400 mt-1">
@@ -804,7 +968,7 @@ const DiaryBoard = () => {
                           </div>
                           {user && (
                             <button
-                              onClick={() => startEdit(post.id, post.content, post.images || [])}
+                              onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
                               className="ml-3 p-1 text-gray-400 hover:text-blue-500 transition-colors"
                               title="수정"
                             >
@@ -812,42 +976,52 @@ const DiaryBoard = () => {
                             </button>
                           )}
                         </div>
-                        
+
                         {/* 이미지 표시 */}
                         {post.images && post.images.length > 0 && (
-                          <div className={`mt-3 ${
-                            expandedPosts.has(post.id) 
-                              ? 'grid grid-cols-2 gap-2' 
-                              : 'flex justify-center'
-                          }`}>
+                          <div className="mt-3 w-full">
                             {expandedPosts.has(post.id) ? (
-                              post.images.map((image) => (
-                                <img 
-                                  key={image.id}
-                                  src={image.data} 
-                                  alt={image.name}
-                                  className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => window.open(image.data, '_blank')}
-                                />
-                              ))
-                            ) : (
-                              <div className="relative">
-                                <img 
-                                  src={post.images[0].data} 
-                                  alt={post.images[0].name}
-                                  className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => window.open(post.images[0].data, '_blank')}
-                                />
-                                {post.images.length > 1 && (
-                                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-                                    +{post.images.length - 1} more
+                              // 펼쳐진 상태: 모든 이미지를 세로로 배치, 원본 비율 유지
+                              <div className="w-full">
+                                {post.images.map((image, index) => (
+                                  <div key={image.id} className="mb-4 w-full">
+                                    <img
+                                      src={image.data}
+                                      alt={image.name}
+                                      className="block w-auto max-w-none rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                                      style={{
+                                        display: 'block',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        maxWidth: 'none',
+                                        maxHeight: 'none'
+                                      }}
+                                      onClick={() => window.open(image.data, '_blank')}
+                                    />
                                   </div>
-                                )}
+                                ))}
+                              </div>
+                            ) : (
+                              // 접힌 상태: 첫 번째 이미지만 작게 표시
+                              <div className="flex justify-center">
+                                <div className="relative">
+                                  <img
+                                    src={post.images[0].data}
+                                    alt={post.images[0].name}
+                                    className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => window.open(post.images[0].data, '_blank')}
+                                  />
+                                  {post.images.length > 1 && (
+                                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                                      +{post.images.length - 1} more
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
                         )}
-                        
+
                         {/* 더보기/접기 버튼 */}
                         {shouldShowMoreButton(post) && (
                           <div className="mt-3">
@@ -859,7 +1033,7 @@ const DiaryBoard = () => {
                             </button>
                           </div>
                         )}
-                        
+
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-xs text-gray-500">{post.createdAt}</p>
                           {post.author && (
