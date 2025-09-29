@@ -17,5 +17,3 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export default app;
 
-// 🚨 Storage 서비스 초기화 및 export 추가
-//export const storage = getStorage(app); 
