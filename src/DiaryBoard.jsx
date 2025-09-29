@@ -28,10 +28,9 @@ const DiaryBoard = () => {
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
 
-  // Firebase 연결 확인
+  // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
     try {
-      // Firebase 연결 테스트
       const unsubscribe = subscribeToAuthState((user) => {
         setUser(user);
         setFirebaseConnected(true);
@@ -39,15 +38,13 @@ const DiaryBoard = () => {
           setIsLoginModalOpen(false);
           setLoginError('');
           setLoginForm({ email: '', password: '' });
-        } else {
-          // setPosts({});
         }
+        // 비로그인 시에도 글을 보여주기 위해 setPosts({}) 로직 제거
       });
       return () => unsubscribe();
     } catch (error) {
       console.log('Firebase 연결 실패, 데모 모드로 실행');
       setFirebaseConnected(false);
-      // 데모 모드용 사용자 복원
       const savedUser = localStorage.getItem('diary_user');
       if (savedUser) {
         setUser(JSON.parse(savedUser));
@@ -55,39 +52,43 @@ const DiaryBoard = () => {
     }
   }, []);
 
-  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
+  // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
 useEffect(() => {
+  // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  // 이 값을 실제 Firebase Firestore에 글을 쓰는 계정의 UID로 변경해야 합니다.
+  const publicViewingUID = user ? user.uid : "your_admin_uid"; 
+
   if (firebaseConnected) {
-    // Firebase 연결 시: 특정 사용자 데이터 또는 공개 데이터 로드
-    if (user) {
-      const unsubscribe = subscribeToUserPosts(user.uid, (newPosts) => {
-        setPosts(newPosts);
-      });
-      return () => unsubscribe();
-    } else {
-      // 비로그인 시에도 공개 데이터 로드 (예: 기본 사용자의 글)
-      // 여기서는 관리자 계정의 글을 공개적으로 보여줌
-      const adminUID = "your_admin_uid"; // 실제 관리자 UID로 변경
-      const unsubscribe = subscribeToUserPosts(adminUID, (newPosts) => {
-        setPosts(newPosts);
-      });
-      return () => unsubscribe();
-    }
+    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 publicViewingUID의 글을 구독
+    // 로그인한 사용자는 자신의 글을 보게 됩니다.
+    const uidToSubscribe = user ? user.uid : publicViewingUID;
+    
+    // user가 있으면 user.uid를 구독, 없으면 publicViewingUID를 구독
+    const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
+      setPosts(newPosts);
+    });
+    return () => unsubscribe();
+
   } else {
     // 데모 모드: localStorage에서 데이터 로드
+    const defaultPostsKey = 'diary_posts_default';
+    let postsToLoad = {};
+    
     if (user) {
+      // 로그인한 경우: 자신의 글을 로드 (데모 모드에서는 분리하여 저장했다고 가정)
       const userPostsKey = `diary_posts_${user.uid}`;
       const userPosts = localStorage.getItem(userPostsKey);
       if (userPosts) {
-        setPosts(JSON.parse(userPosts));
+        postsToLoad = JSON.parse(userPosts);
       }
     } else {
-      // 비로그인 시에도 기본 데이터 로드
-      const defaultPosts = localStorage.getItem('diary_posts_default');
+      // 비로그인 시: 공개 기본 데이터를 로드
+      const defaultPosts = localStorage.getItem(defaultPostsKey);
       if (defaultPosts) {
-        setPosts(JSON.parse(defaultPosts));
+        postsToLoad = JSON.parse(defaultPosts);
       }
     }
+    setPosts(postsToLoad);
   }
 }, [user, firebaseConnected]);
 
@@ -98,7 +99,6 @@ useEffect(() => {
     
     try {
       if (firebaseConnected) {
-        // Firebase 모드
         if (isSignupMode) {
           await signupWithEmail(email, password);
         } else {
@@ -143,7 +143,7 @@ useEffect(() => {
     setIsLoading(false);
   };
 
-  // 로그아웃 함수
+  // 💡 [수정] 로그아웃 함수
   const handleLogout = async () => {
     try {
       if (firebaseConnected) {
@@ -151,7 +151,7 @@ useEffect(() => {
       } else {
         localStorage.removeItem('diary_user');
         setUser(null);
-       // setPosts({});
+        // setPosts({}); 대신 useEffect에서 자동으로 공개 데이터를 로드하도록 처리
       }
       setIsWriting(false);
       setEditingId(null);
@@ -160,16 +160,18 @@ useEffect(() => {
     }
   };
 
-  // 데모 모드용 데이터 저장
-// 데모 모드용 데이터 저장
+  // 💡 [수정] 데모 모드용 데이터 저장
 const saveUserPosts = (newPosts) => {
   if (!firebaseConnected) {
     if (user) {
+      // 로그인한 경우, 사용자별 저장소와 공개 저장소 모두 업데이트
       const userPostsKey = `diary_posts_${user.uid}`;
       localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts)); // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+    } else {
+      // 비로그인 상태에서 저장 로직은 실행되지 않아야 하지만, 안전을 위해 기본 데이터 업데이트
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
     }
-    // 공개 영역에도 저장 (비로그인 사용자도 볼 수 있게)
-    localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
     setPosts(newPosts);
   }
 };
@@ -646,7 +648,7 @@ const saveUserPosts = (newPosts) => {
                   }}
                   className="text-sm text-blue-500 hover:text-blue-600"
                 >
-                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : ''}
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
                 </button>
               </div>
             </div>
@@ -755,11 +757,6 @@ const saveUserPosts = (newPosts) => {
                   filtering by: {selectedTags.join(' ')}
                 </div>
               )}
-              {/* Firebase 연결 상태 표시 */}
-              {/* <div className="text-xs text-gray-400 mt-1">
-                  {firebaseConnected ? ' 🟢 Firebase 연결됨' : ' 🟡 데모 모드'}
-                </div>
-              */}
             </div>
             <div className="flex gap-2">
               <button
@@ -862,7 +859,7 @@ const saveUserPosts = (newPosts) => {
                       {user ? (
                         <p className="text-sm">+ 버튼을 눌러 새 글을 작성해보세요.</p>
                       ) : (
-                        <p className="text-sm">로그인하면 글을 작성할 수 있습니다.</p>
+                        <p className="text-sm">다른 날짜의 글을 보거나 로그인하여 작성해보세요.</p>
                       )}
                     </>
                   ) : (
@@ -877,7 +874,7 @@ const saveUserPosts = (newPosts) => {
                     {user ? (
                       <p className="text-sm">+ 버튼을 눌러 새 글을 작성해보세요.</p>
                     ) : (
-                      <p className="text-sm">로그인하면 글을 작성할 수 있습니다.</p>
+                      <p className="text-sm">다른 날짜의 글을 보거나 로그인하여 작성해보세요.</p>
                     )}
                   </>
                 ) : null}
@@ -990,7 +987,7 @@ const saveUserPosts = (newPosts) => {
                               </p>
                             )}
                           </div>
-                          {user && (
+                          {user && ( // 💡 [유지] 로그인한 사용자만 수정 버튼 표시
                             <button
                               onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
                               className="ml-3 p-1 text-gray-400 hover:text-blue-500 transition-colors"
