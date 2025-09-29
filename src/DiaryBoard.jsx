@@ -55,48 +55,35 @@ const DiaryBoard = () => {
   // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
 useEffect(() => {
   // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
-  // 이 값을 실제 Firebase Firestore에 글을 쓰는 계정의 UID로 변경해야 합니다.
-  const publicViewingUID = user ? user.uid : "iheQeOZ0UWhN0IVUO0Lwip1EWsr2"; 
+  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
+useEffect(() => {
+  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
 
   if (firebaseConnected) {
-    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 publicViewingUID의 글을 구독
-    // 로그인한 사용자는 자신의 글을 보게 됩니다.
+    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 지정된 글을 구독
     const uidToSubscribe = user ? user.uid : publicViewingUID;
-    
-    // user가 있으면 user.uid를 구독, 없으면 publicViewingUID를 구독
+
+    // user가 로그인되어 있으면 자신의 글을, 아니면 publicViewingUID의 글을 구독
     const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
       setPosts(newPosts);
-    } else {
-      // 비로그인 시에도 공개 데이터 로드 (예: 기본 사용자의 글)
-      // 여기서는 관리자 계정의 글을 공개적으로 보여줌
-      // 🚨 "iheQe0Z0UWhN0IVU00Lwip1EWsr2"는 스크린샷에서 확인된 실제 관리자 UID입니다.
-      const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 수정합니다.
-      const unsubscribe = subscribeToUserPosts(adminUID, (newPosts) => {
-        setPosts(newPosts);
-      });
-      return () => unsubscribe();
-    }
-
+    });
+    return () => unsubscribe();
   } else {
-    // 데모 모드: localStorage에서 데이터 로드
-    const defaultPostsKey = 'diary_posts_default';
-    let postsToLoad = {};
-    
+    // 데모 모드: localStorage에서 데이터 로드 (기존 로직 유지)
     if (user) {
-      // 로그인한 경우: 자신의 글을 로드 (데모 모드에서는 분리하여 저장했다고 가정)
       const userPostsKey = `diary_posts_${user.uid}`;
       const userPosts = localStorage.getItem(userPostsKey);
       if (userPosts) {
-        postsToLoad = JSON.parse(userPosts);
+        setPosts(JSON.parse(userPosts));
       }
     } else {
-      // 비로그인 시: 공개 기본 데이터를 로드
-      const defaultPosts = localStorage.getItem(defaultPostsKey);
+      // 비로그인 시에도 기본 데이터 로드 (데모 모드)
+      const defaultPosts = localStorage.getItem('diary_posts_default');
       if (defaultPosts) {
-        postsToLoad = JSON.parse(defaultPosts);
+        setPosts(JSON.parse(defaultPosts));
       }
     }
-    setPosts(postsToLoad);
   }
 }, [user, firebaseConnected]);
 
