@@ -28,7 +28,7 @@ const DiaryBoard = () => {
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
 
-  // Firebase 연결 확인 및 초기 사용자 설정
+  // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
     try {
       const unsubscribe = subscribeToAuthState((user) => {
@@ -39,6 +39,7 @@ const DiaryBoard = () => {
           setLoginError('');
           setLoginForm({ email: '', password: '' });
         }
+        // 비로그인 시에도 글을 보여주기 위해 setPosts({}) 로직 제거
       });
       return () => unsubscribe();
     } catch (error) {
@@ -51,30 +52,40 @@ const DiaryBoard = () => {
     }
   }, []);
 
-  // 사용자별 또는 공개 데이터 실시간 구독/로드
-  useEffect(() => {
-    const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2";
-    if (firebaseConnected) {
-      const uidToSubscribe = user ? user.uid : publicViewingUID;
-      const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
-        setPosts(newPosts);
-      });
-      return () => unsubscribe();
+  // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
+
+  // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
+useEffect(() => {
+  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
+
+  if (firebaseConnected) {
+    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 지정된 글을 구독
+    const uidToSubscribe = user ? user.uid : publicViewingUID;
+
+    // user가 로그인되어 있으면 자신의 글을, 아니면 publicViewingUID의 글을 구독
+    const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
+      setPosts(newPosts);
+    });
+    return () => unsubscribe();
+  } else {
+    // 데모 모드: localStorage에서 데이터 로드 (기존 로직 유지)
+    if (user) {
+      const userPostsKey = `diary_posts_${user.uid}`;
+      const userPosts = localStorage.getItem(userPostsKey);
+      if (userPosts) {
+        setPosts(JSON.parse(userPosts));
+      }
     } else {
-      if (user) {
-        const userPostsKey = `diary_posts_${user.uid}`;
-        const userPosts = localStorage.getItem(userPostsKey);
-        if (userPosts) {
-          setPosts(JSON.parse(userPosts));
-        }
-      } else {
-        const defaultPosts = localStorage.getItem('diary_posts_default');
-        if (defaultPosts) {
-          setPosts(JSON.parse(defaultPosts));
-        }
+      // 비로그인 시에도 기본 데이터 로드 (데모 모드)
+      const defaultPosts = localStorage.getItem('diary_posts_default');
+      if (defaultPosts) {
+        setPosts(JSON.parse(defaultPosts));
       }
     }
-  }, [user, firebaseConnected]);
+  }
+}, [user, firebaseConnected]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
@@ -89,6 +100,7 @@ const DiaryBoard = () => {
           await loginWithEmail(email, password);
         }
       } else {
+        // 데모 모드
         if (isSignupMode) {
           const existingUsers = JSON.parse(localStorage.getItem('diary_users') || '[]');
           if (existingUsers.find(u => u.email === email)) {
@@ -126,7 +138,7 @@ const DiaryBoard = () => {
     setIsLoading(false);
   };
 
-  // 로그아웃 함수
+  // 💡 [수정] 로그아웃 함수
   const handleLogout = async () => {
     try {
       if (firebaseConnected) {
@@ -134,6 +146,7 @@ const DiaryBoard = () => {
       } else {
         localStorage.removeItem('diary_user');
         setUser(null);
+        // setPosts({}); 대신 useEffect에서 자동으로 공개 데이터를 로드하도록 처리
       }
       setIsWriting(false);
       setEditingId(null);
@@ -142,24 +155,26 @@ const DiaryBoard = () => {
     }
   };
 
-  // 데모 모드용 데이터 저장
-  const saveUserPosts = (newPosts) => {
-    if (!firebaseConnected) {
-      if (user) {
-        const userPostsKey = `diary_posts_${user.uid}`;
-        localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
-        localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
-      } else {
-        localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
-      }
-      setPosts(newPosts);
+  // 💡 [수정] 데모 모드용 데이터 저장
+const saveUserPosts = (newPosts) => {
+  if (!firebaseConnected) {
+    if (user) {
+      // 로그인한 경우, 사용자별 저장소와 공개 저장소 모두 업데이트
+      const userPostsKey = `diary_posts_${user.uid}`;
+      localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts)); // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+    } else {
+      // 비로그인 상태에서 저장 로직은 실행되지 않아야 하지만, 안전을 위해 기본 데이터 업데이트
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
     }
-  };
+    setPosts(newPosts);
+  }
+};
 
   // 글 작성
   const handleWrite = async () => {
     if (!user) {
-      setIsLoginModalOpen(true); // 비로그인 시 로그인 모달 표시
+      setIsLoginModalOpen(true);
       return;
     }
 
@@ -260,6 +275,7 @@ const DiaryBoard = () => {
       return;
     }
 
+    // 삭제 확인 경고
     const isConfirmed = window.confirm('정말 삭제하겠습니까?');
     if (!isConfirmed) return;
 
@@ -660,7 +676,7 @@ const DiaryBoard = () => {
                 {isLoading ? (isSignupMode ? '가입 중...' : '로그인 중...') : (isSignupMode ? '회원가입' : '로그인')}
               </button>
 
-              {/* 회원가입/로그인 전환 버튼 */}
+              {/* 회원가입/로그인 전환 버튼 - 항상 표시 */}
               <div className="text-center">
                 <button
                   onClick={() => {
@@ -669,7 +685,7 @@ const DiaryBoard = () => {
                   }}
                   className="text-sm text-blue-500 hover:text-blue-600"
                 >
-                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : ''}
                 </button>
               </div>
             </div>
@@ -783,17 +799,34 @@ const DiaryBoard = () => {
               <button
                 onClick={handleWrite}
                 className={`
-                  px-3 py-1 text-sm font-medium transition-all duration-200
-                  ${user
-                    ? 'bg-black text-white hover:bg-gray-800'
-                    : 'bg-white text-black border border-gray-300 hover:bg-gray-100'
+                  px-3 py-1 text-sm font-medium transition-all duration-200 text-white
+                  ${!user
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : isWriting
+                      ? 'bg-black hover:bg-gray-800'
+                      : 'bg-black hover:bg-gray-800'
                   }
                 `}
-                title={!user ? '로그인이 필요합니다' : '새 글 작성'}
+                title={!user ? '로그인이 필요합니다' : ''}
               >
-                +
+                {isWriting ? 'done' : '+'}
               </button>
-              {/* [수정] 로그인/로그아웃 버튼 제거 */}
+
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  logout
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  login
+                </button>
+              )}
             </div>
           </div>
 
@@ -1015,6 +1048,7 @@ const DiaryBoard = () => {
                         {post.images && post.images.length > 0 && (
                           <div className="mt-3 w-full">
                             {expandedPosts.has(post.id) ? (
+                              // 펼쳐진 상태: 모든 이미지를 세로로 배치, 원본 비율 유지
                               <div className="w-full">
                                 {post.images.map((image, index) => (
                                   <div key={image.id} className="mb-4 w-full">
@@ -1035,6 +1069,7 @@ const DiaryBoard = () => {
                                 ))}
                               </div>
                             ) : (
+                              // 접힌 상태: 첫 번째 이미지만 작게 표시
                               <div className="flex justify-center">
                                 <div className="relative">
                                   <img
@@ -1086,4 +1121,3 @@ const DiaryBoard = () => {
 }
 
 export default DiaryBoard;
-
