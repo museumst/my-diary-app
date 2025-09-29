@@ -275,6 +275,10 @@ const saveUserPosts = (newPosts) => {
       return;
     }
 
+    // 삭제 확인 경고
+    const isConfirmed = window.confirm('정말 삭제하겠습니까?');
+    if (!isConfirmed) return;
+
     const targetDate = postDate || selectedDate;
 
     try {
