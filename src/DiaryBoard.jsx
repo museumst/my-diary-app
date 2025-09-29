@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Edit3, Check, X, Image } from 'lucide-react';
+import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
 import {  
   addPostToDate, 
   updatePostInDate, 
-  // deletePostFromDate, 
+  deletePostFromDate, 
   subscribeToUserPosts 
 } from './services/firestoreService';
 
@@ -246,7 +246,7 @@ const saveUserPosts = (newPosts) => {
         await updatePostInDate(user.uid, editingDate, editingId, updatedData);
       } else {
         const newPosts = {
-          ...posts,
+          ...posts, 
           [editingDate]: posts[editingDate].map(post =>
             post.id === editingId
               ? { ...post, content: editText.trim(), images: editImages }
@@ -263,6 +263,44 @@ const saveUserPosts = (newPosts) => {
     } catch (error) {
       console.error('Error updating post:', error);
       setLoginError('글 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 글 삭제
+  const handleDelete = async (postId, postDate = null) => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    const targetDate = postDate || selectedDate;
+
+    try {
+      setIsLoading(true);
+      if (firebaseConnected) {
+        await deletePostFromDate(user.uid, targetDate, postId);
+      } else {
+        const dayPosts = posts[targetDate] || [];
+        const newDayPosts = dayPosts.filter(p => p.id !== postId);
+        const newPosts = { ...posts };
+        if (newDayPosts.length === 0) {
+          delete newPosts[targetDate];
+        } else {
+          newPosts[targetDate] = newDayPosts;
+        }
+        saveUserPosts(newPosts);
+      }
+      if (editingId === postId) {
+        setEditingId(null);
+        setEditText('');
+        setEditImages([]);
+        setEditingDate(null);
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      setLoginError('글 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -982,14 +1020,23 @@ const saveUserPosts = (newPosts) => {
                               </p>
                             )}
                           </div>
-                          {user && ( // 💡 [유지] 로그인한 사용자만 수정 버튼 표시
-                            <button
-                              onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
-                              className="ml-3 p-1 text-gray-400 hover:text-blue-500 transition-colors"
-                              title="수정"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
+                          {user && (
+                            <div className="ml-3 flex items-center gap-1">
+                              <button
+                                onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
+                                className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                                title="수정"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(post.id, post.date)}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                title="삭제"
+                              >
+                                <Trash className="w-4 h-4" />
+                              </button>
+                            </div>
                           )}
                         </div>
 
