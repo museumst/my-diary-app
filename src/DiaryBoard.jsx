@@ -66,8 +66,16 @@ useEffect(() => {
     // user가 있으면 user.uid를 구독, 없으면 publicViewingUID를 구독
     const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
       setPosts(newPosts);
-    });
-    return () => unsubscribe();
+    } else {
+      // 비로그인 시에도 공개 데이터 로드 (예: 기본 사용자의 글)
+      // 여기서는 관리자 계정의 글을 공개적으로 보여줌
+      // 🚨 "iheQe0Z0UWhN0IVU00Lwip1EWsr2"는 스크린샷에서 확인된 실제 관리자 UID입니다.
+      const adminUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 수정합니다.
+      const unsubscribe = subscribeToUserPosts(adminUID, (newPosts) => {
+        setPosts(newPosts);
+      });
+      return () => unsubscribe();
+    }
 
   } else {
     // 데모 모드: localStorage에서 데이터 로드
