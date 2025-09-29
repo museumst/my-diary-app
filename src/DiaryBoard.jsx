@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
@@ -29,10 +28,6 @@ const DiaryBoard = () => {
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
 
-  // 공개 블로그 소유자 UID (항상 이 사용자의 글만 표시)
-  const OWNER_UID = process.env.REACT_APP_OWNER_UID || "iheQe0Z0UWhN0IVU00Lwip1EWsr2";
-  const isOwner = !!user && user.uid === OWNER_UID;
-
   // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
     try {
@@ -59,21 +54,38 @@ const DiaryBoard = () => {
 
   // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
 
-// 공개 모드: 항상 OWNER_UID의 글만 구독
+  // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
 useEffect(() => {
+  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
+
   if (firebaseConnected) {
-    const unsubscribe = subscribeToUserPosts(OWNER_UID, (newPosts) => {
+    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 지정된 글을 구독
+    const uidToSubscribe = user ? user.uid : publicViewingUID;
+
+    // user가 로그인되어 있으면 자신의 글을, 아니면 publicViewingUID의 글을 구독
+    const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
       setPosts(newPosts);
     });
     return () => unsubscribe();
   } else {
-    // 데모 모드: 공개 데이터 로드
-    const defaultPosts = localStorage.getItem('diary_posts_default');
-    if (defaultPosts) {
-      setPosts(JSON.parse(defaultPosts));
+    // 데모 모드: localStorage에서 데이터 로드 (기존 로직 유지)
+    if (user) {
+      const userPostsKey = `diary_posts_${user.uid}`;
+      const userPosts = localStorage.getItem(userPostsKey);
+      if (userPosts) {
+        setPosts(JSON.parse(userPosts));
+      }
+    } else {
+      // 비로그인 시에도 기본 데이터 로드 (데모 모드)
+      const defaultPosts = localStorage.getItem('diary_posts_default');
+      if (defaultPosts) {
+        setPosts(JSON.parse(defaultPosts));
+      }
     }
   }
-}, [firebaseConnected]);
+}, [user, firebaseConnected]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
@@ -161,7 +173,7 @@ const saveUserPosts = (newPosts) => {
 
   // 글 작성
   const handleWrite = async () => {
-    if (!isOwner) {
+    if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
@@ -180,7 +192,7 @@ const saveUserPosts = (newPosts) => {
           };
           
           if (firebaseConnected) {
-            await addPostToDate(OWNER_UID, selectedDate, newPostData);
+            await addPostToDate(user.uid, selectedDate, newPostData);
           } else {
             const newPosts = {
               ...posts,
@@ -209,7 +221,7 @@ const saveUserPosts = (newPosts) => {
 
   // 글 수정 시작
   const startEdit = (postId, content, images = [], postDate = null) => {
-    if (!isOwner) {
+    if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
@@ -231,7 +243,7 @@ const saveUserPosts = (newPosts) => {
           content: editText.trim(),
           images: editImages
         };
-        await updatePostInDate(OWNER_UID, editingDate, editingId, updatedData);
+        await updatePostInDate(user.uid, editingDate, editingId, updatedData);
       } else {
         const newPosts = {
           ...posts, 
@@ -258,7 +270,7 @@ const saveUserPosts = (newPosts) => {
 
   // 글 삭제
   const handleDelete = async (postId, postDate = null) => {
-    if (!isOwner) {
+    if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
@@ -272,7 +284,7 @@ const saveUserPosts = (newPosts) => {
     try {
       setIsLoading(true);
       if (firebaseConnected) {
-        await deletePostFromDate(OWNER_UID, targetDate, postId);
+        await deletePostFromDate(user.uid, targetDate, postId);
       } else {
         const dayPosts = posts[targetDate] || [];
         const newDayPosts = dayPosts.filter(p => p.id !== postId);
@@ -784,18 +796,21 @@ const saveUserPosts = (newPosts) => {
               )}
             </div>
             <div className="flex gap-2">
-              {isOwner && (
-                <button
-                  onClick={handleWrite}
-                  className={`
-                    px-3 py-1 text-sm font-medium transition-all duration-200 text-white
-                    ${isWriting ? 'bg-black hover:bg-gray-800' : 'bg-black hover:bg-gray-800'}
-                  `}
-                  title={''}
-                >
-                  {isWriting ? 'done' : '+'}
-                </button>
-              )}
+              <button
+                onClick={handleWrite}
+                className={`
+                  px-3 py-1 text-sm font-medium transition-all duration-200 text-white
+                  ${!user
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : isWriting
+                      ? 'bg-black hover:bg-gray-800'
+                      : 'bg-black hover:bg-gray-800'
+                  }
+                `}
+                title={!user ? '로그인이 필요합니다' : ''}
+              >
+                {isWriting ? 'done' : '+'}
+              </button>
 
               {user ? (
                 <button
@@ -805,7 +820,12 @@ const saveUserPosts = (newPosts) => {
                   logout
                 </button>
               ) : (
-                <></>
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  login
+                </button>
               )}
             </div>
           </div>
@@ -1004,7 +1024,7 @@ const saveUserPosts = (newPosts) => {
                               </p>
                             )}
                           </div>
-                          {isOwner && (
+                          {user && (
                             <div className="ml-3 flex items-center gap-1">
                               <button
                                 onClick={() => startEdit(post.id, post.content, post.images || [], post.date)}
