@@ -56,21 +56,40 @@ const DiaryBoard = () => {
   }, []);
 
   // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
-  useEffect(() => {
-    if (user && firebaseConnected) {
+useEffect(() => {
+  if (firebaseConnected) {
+    // Firebase 연결 시: 특정 사용자 데이터 또는 공개 데이터 로드
+    if (user) {
       const unsubscribe = subscribeToUserPosts(user.uid, (newPosts) => {
         setPosts(newPosts);
       });
       return () => unsubscribe();
-    } else if (user && !firebaseConnected) {
-      // 데모 모드용 데이터 로드
+    } else {
+      // 비로그인 시에도 공개 데이터 로드 (예: 기본 사용자의 글)
+      // 여기서는 관리자 계정의 글을 공개적으로 보여줌
+      const adminUID = "your_admin_uid"; // 실제 관리자 UID로 변경
+      const unsubscribe = subscribeToUserPosts(adminUID, (newPosts) => {
+        setPosts(newPosts);
+      });
+      return () => unsubscribe();
+    }
+  } else {
+    // 데모 모드: localStorage에서 데이터 로드
+    if (user) {
       const userPostsKey = `diary_posts_${user.uid}`;
       const userPosts = localStorage.getItem(userPostsKey);
       if (userPosts) {
         setPosts(JSON.parse(userPosts));
       }
+    } else {
+      // 비로그인 시에도 기본 데이터 로드
+      const defaultPosts = localStorage.getItem('diary_posts_default');
+      if (defaultPosts) {
+        setPosts(JSON.parse(defaultPosts));
+      }
     }
-  }, [user, firebaseConnected]);
+  }
+}, [user, firebaseConnected]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
@@ -142,13 +161,18 @@ const DiaryBoard = () => {
   };
 
   // 데모 모드용 데이터 저장
-  const saveUserPosts = (newPosts) => {
-    if (user && !firebaseConnected) {
+// 데모 모드용 데이터 저장
+const saveUserPosts = (newPosts) => {
+  if (!firebaseConnected) {
+    if (user) {
       const userPostsKey = `diary_posts_${user.uid}`;
       localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
-      setPosts(newPosts);
     }
-  };
+    // 공개 영역에도 저장 (비로그인 사용자도 볼 수 있게)
+    localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
+    setPosts(newPosts);
+  }
+};
 
   // 글 작성
   const handleWrite = async () => {
