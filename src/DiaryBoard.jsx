@@ -40,7 +40,7 @@ const DiaryBoard = () => {
           setLoginError('');
           setLoginForm({ email: '', password: '' });
         } else {
-          setPosts({});
+          // setPosts({});
         }
       });
       return () => unsubscribe();
