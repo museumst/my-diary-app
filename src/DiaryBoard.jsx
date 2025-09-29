@@ -56,7 +56,7 @@ const DiaryBoard = () => {
 useEffect(() => {
   // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
   // 이 값을 실제 Firebase Firestore에 글을 쓰는 계정의 UID로 변경해야 합니다.
-  const publicViewingUID = user ? user.uid : "your_admin_uid"; 
+  const publicViewingUID = user ? user.uid : "iheQeOZ0UWhN0IVUO0Lwip1EWsr2"; 
 
   if (firebaseConnected) {
     // Firebase 연결 시: 사용자 로그인 여부와 관계없이 publicViewingUID의 글을 구독
