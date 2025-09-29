@@ -132,7 +132,7 @@ const DiaryBoard = () => {
       } else {
         localStorage.removeItem('diary_user');
         setUser(null);
-        setPosts({});
+       // setPosts({});
       }
       setIsWriting(false);
       setEditingId(null);
