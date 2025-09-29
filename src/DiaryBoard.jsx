@@ -62,7 +62,7 @@ useEffect(() => {
 
   if (firebaseConnected) {
     // Firebase 연결 시: 사용자 로그인 여부와 관계없이 지정된 글을 구독
-    const uidToSubscribe = user ? user.uid : publicViewingUID;
+    const uidToSubscribe = publicViewingUID;
 
     // user가 로그인되어 있으면 자신의 글을, 아니면 publicViewingUID의 글을 구독
     const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
