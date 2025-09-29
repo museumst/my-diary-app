@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
@@ -72,7 +73,7 @@ useEffect(() => {
       setPosts(JSON.parse(defaultPosts));
     }
   }
-}, [firebaseConnected, OWNER_UID]);
+}, [firebaseConnected]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
