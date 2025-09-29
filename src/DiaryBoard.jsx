@@ -72,7 +72,7 @@ useEffect(() => {
       setPosts(JSON.parse(defaultPosts));
     }
   }
-}, [firebaseConnected]);
+}, [firebaseConnected, OWNER_UID]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
