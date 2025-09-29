@@ -1067,6 +1067,6 @@ const saveUserPosts = (newPosts) => {
       </div>
     </div>
   );
-},
+}
 
 export default DiaryBoard;
