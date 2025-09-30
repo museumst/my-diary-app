@@ -5,7 +5,7 @@ import {
   addPostToDate, 
   updatePostInDate, 
   deletePostFromDate, 
-  subscribeToAllPosts
+  subscribeToUserPosts 
 } from './services/firestoreService';
 
 const DiaryBoard = () => {
@@ -27,33 +27,69 @@ const DiaryBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
+
+  // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   
-
-
+  // Firebase 연결 확인 및 초기 사용자 설정
+// Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
-    // Firebase 연결 시도 자체를 건너뛰기
-    setFirebaseConnected(false);
-    const savedUser = localStorage.getItem('diary_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    try {
+      const unsubscribe = subscribeToAuthState((user) => {
+        setUser(user);
+        setFirebaseConnected(true);
+        if (user) {
+          setIsLoginModalOpen(false);
+          setLoginError('');
+          setLoginForm({ email: '', password: '' });
+        }
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.log('Firebase 연결 실패, 데모 모드로 실행');
+      setFirebaseConnected(false);
+      const savedUser = localStorage.getItem('diary_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
     }
   }, []);
 
 
- useEffect(() => {
+  useEffect(() => {
+  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
+  console.log('firebaseConnected:', firebaseConnected);
+  console.log('user:', user);
+  console.log('로그아웃 상태에서 구독할 UID:', publicViewingUID);
+
   if (firebaseConnected) {
-    const unsubscribe = subscribeToAllPosts((newPosts) => {
+    // Firebase 연결 시: 사용자 로그인 여부와 관계없이 지정된 글을 구독
+    const uidToSubscribe = user ? user.uid : publicViewingUID;
+    console.log('실제 구독 UID:', uidToSubscribe);
+
+    // user가 로그인되어 있으면 자신의 글을, 아니면 publicViewingUID의 글을 구독
+    const unsubscribe = subscribeToUserPosts(uidToSubscribe, (newPosts) => {
+      console.log('받은 posts:', newPosts);
       setPosts(newPosts);
     });
     return () => unsubscribe();
   } else {
-    // localStorage에서 데이터 로드
-    const defaultPosts = localStorage.getItem('diary_posts_default');
-    if (defaultPosts) {
-      setPosts(JSON.parse(defaultPosts));
+    // 데모 모드: localStorage에서 데이터 로드 (기존 로직 유지)
+    if (user) {
+      const userPostsKey = `diary_posts_${user.uid}`;
+      const userPosts = localStorage.getItem(userPostsKey);
+      if (userPosts) {
+        setPosts(JSON.parse(userPosts));
+      }
+    } else {
+      // 비로그인 시에도 기본 데이터 로드 (데모 모드)
+      const defaultPosts = localStorage.getItem('diary_posts_default');
+      if (defaultPosts) {
+        setPosts(JSON.parse(defaultPosts));
+      }
     }
   }
-}, [firebaseConnected]);
+}, [user, firebaseConnected]);
 
 
   // 로그인/회원가입 함수
@@ -125,14 +161,20 @@ const DiaryBoard = () => {
   };
 
   // 💡 [수정] 데모 모드용 데이터 저장
-  const saveUserPosts = (newPosts) => {
-    if (!firebaseConnected) {
-      // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+const saveUserPosts = (newPosts) => {
+  if (!firebaseConnected) {
+    if (user) {
+      // 로그인한 경우, 사용자별 저장소와 공개 저장소 모두 업데이트
+      const userPostsKey = `diary_posts_${user.uid}`;
+      localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts)); // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+    } else {
+      // 비로그인 상태에서 저장 로직은 실행되지 않아야 하지만, 안전을 위해 기본 데이터 업데이트
       localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
-      setPosts(newPosts);
     }
-  };
-
+    setPosts(newPosts);
+  }
+};
 
   // 글 작성
   const handleWrite = async () => {
@@ -155,7 +197,7 @@ const DiaryBoard = () => {
           };
           
           if (firebaseConnected) {
-            await addPostToDate(selectedDate, newPostData);
+            await addPostToDate(user.uid, selectedDate, newPostData);
           } else {
             const newPosts = {
               ...posts,
@@ -206,7 +248,7 @@ const DiaryBoard = () => {
           content: editText.trim(),
           images: editImages
         };
-        await updatePostInDate(editingDate, editingId, updatedData);
+        await updatePostInDate(user.uid, editingDate, editingId, updatedData);
       } else {
         const newPosts = {
           ...posts, 
@@ -247,7 +289,7 @@ const DiaryBoard = () => {
     try {
       setIsLoading(true);
       if (firebaseConnected) {
-        await deletePostFromDate(targetDate, postId);
+        await deletePostFromDate(user.uid, targetDate, postId);
       } else {
         const dayPosts = posts[targetDate] || [];
         const newDayPosts = dayPosts.filter(p => p.id !== postId);

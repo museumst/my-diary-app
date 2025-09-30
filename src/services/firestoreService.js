@@ -1,50 +1,29 @@
 // src/services/firestoreService.js
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
   onSnapshot,
+  query,
+  orderBy
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// 사용자별 일기 데이터 경로: users/{userId}/posts/{date}
-// 각 날짜별로 문서 하나, 그 안에 posts 배열로 여러 글 저장
+// 공개 블로그: 각 글이 독립된 문서
+// 구조: posts/{postId} (사용자 구분 없음)
 
-// 특정 날짜의 일기 데이터 가져오기
-export const getPostsForDate = async (userId, date) => {
+// 글 추가
+export const addPostToDate = async (date, post) => {
   try {
-    const docRef = doc(db, 'users', userId, 'posts', date);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return docSnap.data().posts || [];
-    } else {
-      return [];
-    }
-  } catch (error) {
-    console.error('Error getting posts for date:', error);
-    throw error;
-  }
-};
-
-// 특정 날짜에 새 글 추가
-export const addPostToDate = async (userId, date, post) => {
-  try {
-    const docRef = doc(db, 'users', userId, 'posts', date);
-    const docSnap = await getDoc(docRef);
-    
-    let posts = [];
-    if (docSnap.exists()) {
-      posts = docSnap.data().posts || [];
-    }
-    
-    posts.push(post);
-    
-    await setDoc(docRef, { posts }, { merge: true });
+    const postRef = doc(db, 'posts', post.id);
+    await setDoc(postRef, {
+      ...post,
+      date,
+      createdAt: new Date().toISOString()
+    });
     return post;
   } catch (error) {
     console.error('Error adding post:', error);
@@ -52,91 +31,52 @@ export const addPostToDate = async (userId, date, post) => {
   }
 };
 
-// 특정 날짜의 글 수정
-export const updatePostInDate = async (userId, date, postId, updatedPost) => {
+// 글 수정
+export const updatePostInDate = async (date, postId, updatedPost) => {
   try {
-    const docRef = doc(db, 'users', userId, 'posts', date);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      let posts = docSnap.data().posts || [];
-      const postIndex = posts.findIndex(post => post.id === postId);
-      
-      if (postIndex !== -1) {
-        posts[postIndex] = { ...posts[postIndex], ...updatedPost };
-        await updateDoc(docRef, { posts });
-        return posts[postIndex];
-      }
-    }
-    throw new Error('Post not found');
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      ...updatedPost,
+      updatedAt: new Date().toISOString()
+    });
+    return true;
   } catch (error) {
     console.error('Error updating post:', error);
     throw error;
   }
 };
 
-// 특정 날짜의 글 삭제
-export const deletePostFromDate = async (userId, date, postId) => {
+// 글 삭제
+export const deletePostFromDate = async (date, postId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'posts', date);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      let posts = docSnap.data().posts || [];
-      posts = posts.filter(post => post.id !== postId);
-      
-      if (posts.length === 0) {
-        await deleteDoc(docRef);
-      } else {
-        await updateDoc(docRef, { posts });
-      }
-      return true;
-    }
-    return false;
+    const postRef = doc(db, 'posts', postId);
+    await deleteDoc(postRef);
+    return true;
   } catch (error) {
     console.error('Error deleting post:', error);
     throw error;
   }
 };
 
-// 사용자의 모든 일기 데이터 가져오기 (실시간 리스너)
-export const subscribeToUserPosts = (userId, callback) => {
-  const postsRef = collection(db, 'users', userId, 'posts');
+// 모든 글 구독 (실시간)
+export const subscribeToAllPosts = (callback) => {
+  const postsRef = collection(db, 'posts');
+  const q = query(postsRef, orderBy('date', 'desc'));
   
-  return onSnapshot(postsRef, (snapshot) => {
+  return onSnapshot(q, (snapshot) => {
     const allPosts = {};
     snapshot.forEach((doc) => {
-      allPosts[doc.id] = doc.data().posts || [];
+      const postData = doc.data();
+      const date = postData.date;
+      
+      if (!allPosts[date]) {
+        allPosts[date] = [];
+      }
+      allPosts[date].push({ id: doc.id, ...postData });
     });
     callback(allPosts);
   }, (error) => {
     console.error('Error listening to posts:', error);
     callback({});
   });
-};
-
-// 해시태그로 검색
-export const searchPostsByHashtag = async (userId, hashtag) => {
-  try {
-    const postsRef = collection(db, 'users', userId, 'posts');
-    const snapshot = await getDocs(postsRef);
-    
-    const matchingPosts = [];
-    snapshot.forEach((doc) => {
-      const posts = doc.data().posts || [];
-      posts.forEach(post => {
-        if (post.content.includes(hashtag)) {
-          matchingPosts.push({
-            ...post,
-            date: doc.id
-          });
-        }
-      });
-    });
-    
-    return matchingPosts;
-  } catch (error) {
-    console.error('Error searching posts:', error);
-    throw error;
-  }
 };
