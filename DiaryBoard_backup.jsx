@@ -29,9 +29,6 @@ const DiaryBoard = () => {
   const [firebaseConnected, setFirebaseConnected] = useState(false);
 
   // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
-  
-  
-  /* ///////////////////////////////////////////////////////////////////
   useEffect(() => {
     try {
       const unsubscribe = subscribeToAuthState((user) => {
@@ -54,33 +51,12 @@ const DiaryBoard = () => {
       }
     }
   }, []);
-  ///////////////////////////////////////////////////////////////////// */
-
-  useEffect(() => {
-    // Firebase 연결 시도 자체를 건너뛰기
-    setFirebaseConnected(false);
-    const savedUser = localStorage.getItem('diary_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
 
   // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
 
   // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
   // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
-
-  useEffect(() => {
-    // Firebase 연결 시도 자체를 건너뛰기
-    setFirebaseConnected(false);
-    const savedUser = localStorage.getItem('diary_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
-
-
-  useEffect(() => {
+useEffect(() => {
   // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
   const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
 
@@ -110,7 +86,6 @@ const DiaryBoard = () => {
     }
   }
 }, [user, firebaseConnected]);
-
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
