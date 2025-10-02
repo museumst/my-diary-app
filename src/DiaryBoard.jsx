@@ -32,6 +32,7 @@ const DiaryBoard = () => {
   const [firebaseConnected, setFirebaseConnected] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // ESC 키로 이미지 모달 닫기
   useEffect(() => {
@@ -477,6 +478,86 @@ useEffect(() => {
       reader.onload = () => resolve(reader.result);
       reader.onerror = error => reject(error);
     });
+  };
+
+  // 복사-붙여넣기 핸들러
+  const handlePaste = async (event, isEditing = false) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      event.preventDefault();
+      const imagePromises = files.map(async (file) => {
+        const base64 = await convertToBase64(file);
+        return {
+          id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+          name: file.name,
+          data: base64
+        };
+      });
+      
+      const newImages = await Promise.all(imagePromises);
+      
+      if (isEditing) {
+        setEditImages(prev => [...prev, ...newImages]);
+      } else {
+        setNewPostImages(prev => [...prev, ...newImages]);
+      }
+    }
+  };
+
+  // 드래그 오버 핸들러
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  };
+
+  // 드래그 떠남 핸들러
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+  };
+
+  // 드롭 핸들러
+  const handleDrop = async (event, isEditing = false) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    const imagePromises = imageFiles.map(async (file) => {
+      const base64 = await convertToBase64(file);
+      return {
+        id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+        name: file.name,
+        data: base64
+      };
+    });
+    
+    const newImages = await Promise.all(imagePromises);
+    
+    if (isEditing) {
+      setEditImages(prev => [...prev, ...newImages]);
+    } else {
+      setNewPostImages(prev => [...prev, ...newImages]);
+    }
   };
 
   // 이미지 추가
@@ -965,8 +1046,14 @@ useEffect(() => {
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
-                placeholder="오늘 있었던 일을 기록해보세요..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                onPaste={(e) => handlePaste(e, false)}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, false)}
+                placeholder="오늘 있었던 일을 기록해보세요... (이미지를 복사-붙여넣기하거나 드래그할 수 있습니다)"
+                className={`w-full h-32 p-3 border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono transition-colors ${
+                  isDragging ? 'border-blue-500 border-2 bg-blue-50' : 'border-gray-300'
+                }`}
                 autoFocus
               />
 
@@ -1048,7 +1135,14 @@ useEffect(() => {
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                          onPaste={(e) => handlePaste(e, true)}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, true)}
+                          placeholder="내용을 수정하세요... (이미지를 복사-붙여넣기하거나 드래그할 수 있습니다)"
+                          className={`w-full h-32 p-3 border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono transition-colors ${
+                            isDragging ? 'border-blue-500 border-2 bg-blue-50' : 'border-gray-300'
+                          }`}
                           autoFocus
                         />
 
