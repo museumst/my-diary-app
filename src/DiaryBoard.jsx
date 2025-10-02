@@ -919,12 +919,12 @@ useEffect(() => {
 
           {/* 글 작성 영역 */}
           {isWriting && user && (
-            <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
+            <div className="flex-1 flex flex-col mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="오늘 있었던 일을 기록해보세요..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
                 autoFocus
               />
 
@@ -1002,62 +1002,69 @@ useEffect(() => {
                 {filteredPosts.map((post) => (
                   <div key={post.id} className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     {editingId === post.id ? (
-                      <div className="space-y-3">
+                      <div className="p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap font-mono"
+                          className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
                           autoFocus
                         />
 
                         {/* 수정 중 이미지 미리보기 */}
                         {editImages.length > 0 && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {editImages.map((image) => (
-                              <div key={image.id} className="relative">
-                                <img
-                                  src={image.data}
-                                  alt={image.name}
-                                  className="w-full h-32 object-cover rounded border mx-aut"
-                                />
-                                <button
-                                  onClick={() => removeImage(image.id, true)}
-                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
+                          <div className="mb-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              {editImages.map((image) => (
+                                <div key={image.id} className="relative">
+                                  <img
+                                    src={image.data}
+                                    alt={image.name}
+                                    className="w-full h-32 object-cover rounded border mx-auto"
+                                  />
+                                  <button
+                                    onClick={() => removeImage(image.id, true)}
+                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
-                        {/* 수정 중 이미지 추가 */}
-                        <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
-                          <Image className="w-4 h-4" />
-                          <span>add image</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={async (e) => {
-                              const files = Array.from(e.target.files);
-                              const imagePromises = files.map(async (file) => {
-                                if (file.type.startsWith('image/')) {
-                                  const base64 = await convertToBase64(file);
-                                  return {
-                                    id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-                                    name: file.name,
-                                    data: base64
-                                  };
-                                }
-                                return null;
-                              });
-                              const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
-                              setEditImages(prev => [...prev, ...newImages]);
-                            }}
-                            className="hidden"
-                          />
-                        </label>
+                        {/* 수정 중 이미지 추가 버튼 */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors">
+                            <Image className="w-4 h-4" />
+                            <span>image</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={async (e) => {
+                                const files = Array.from(e.target.files);
+                                const imagePromises = files.map(async (file) => {
+                                  if (file.type.startsWith('image/')) {
+                                    const base64 = await convertToBase64(file);
+                                    return {
+                                      id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                                      name: file.name,
+                                      data: base64
+                                    };
+                                  }
+                                  return null;
+                                });
+                                const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
+                                setEditImages(prev => [...prev, ...newImages]);
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                          <span className="text-xs text-gray-400">
+                            {editImages.length > 0 && `${editImages.length} image(s) added`}
+                          </span>
+                        </div>
 
                         <div className="flex gap-2">
                           <button
