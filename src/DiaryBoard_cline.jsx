@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 // 외부 서비스 파일 참조 유지 (컴파일 오류 예상 지점)
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
 import {  
@@ -30,21 +31,8 @@ const DiaryBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
   
-  // ESC 키로 이미지 모달 닫기
-  useEffect(() => {
-    const handleEscKey = (e) => {
-      if (e.key === 'Escape' && imageModalOpen) {
-        setImageModalOpen(false);
-        setSelectedImage(null);
-      }
-    };
-    
-    window.addEventListener('keydown', handleEscKey);
-    return () => window.removeEventListener('keydown', handleEscKey);
-  }, [imageModalOpen]);
+
 
 useEffect(() => {
   try {
@@ -331,143 +319,6 @@ useEffect(() => {
     return hasImages || hasLongText;
   };
 
-  // 마크다운 스타일 텍스트 렌더링
-  const renderMarkdownText = (text) => {
-    return text
-      .split('\n')
-      .map((line, lineIndex) => {
-        if (line.startsWith('### ')) {
-          return (
-            <h3 key={lineIndex} className="text-lg font-bold text-gray-900 mt-4 mb-2">
-              {line.slice(4)}
-            </h3>
-          );
-        }
-        if (line.startsWith('## ')) {
-          return (
-            <h2 key={lineIndex} className="text-xl font-bold text-gray-900 mt-4 mb-2">
-              {line.slice(3)}
-            </h2>
-          );
-        }
-        if (line.startsWith('# ')) {
-          return (
-            <h1 key={lineIndex} className="text-2xl font-bold text-gray-900 mt-4 mb-2">
-              {line.slice(2)}
-            </h1>
-          );
-        }
-        
-        if (line.startsWith('- ') || line.startsWith('* ')) {
-          return (
-            <li key={lineIndex} className="ml-4 list-disc text-gray-800">
-              {processInlineMarkdown(line.slice(2))}
-            </li>
-          );
-        }
-        
-        if (line.trim() === '') {
-          return <br key={lineIndex} />;
-        }
-        
-        return (
-          <p key={lineIndex} className="text-gray-800 leading-relaxed mb-2">
-            {processInlineMarkdown(line)}
-          </p>
-        );
-      });
-  };
-
-  // 인라인 마크다운 처리
-// 인라인 마크다운 처리
-// 인라인 마크다운 처리
-    const processInlineMarkdown = (text) => {
-    // 마크다운 링크와 URL을 모두 감지
-    const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s]+)/g);
-    
-    return parts.map((part, index) => {
-        // undefined나 빈 문자열 건너뛰기
-        if (!part) return null;
-        
-        // 마크다운 링크 [텍스트](URL) 처리
-        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (linkMatch) {
-        return (
-            <a 
-            key={index} 
-            href={linkMatch[2]} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
-            {linkMatch[1]}
-            </a>
-        );
-        }
-        
-        // 일반 URL (http:// 또는 https://) 처리
-        if (part.match(/^https?:\/\/[^\s]+$/)) {
-        return (
-            <a 
-            key={index} 
-            href={part} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
-            {part}
-            </a>
-        );
-        }
-        
-        // 해시태그
-        if (part.match(/^#[\w가-힣]+$/)) {
-        return (
-            <span key={index} className="text-blue-600 font-medium">
-            {part}
-            </span>
-        );
-        }
-        
-        // 굵게 **text**
-        if (part.startsWith('**') && part.endsWith('**')) {
-        return (
-            <strong key={index} className="font-bold">
-            {part.slice(2, -2)}
-            </strong>
-        );
-        }
-        
-        // 굵게 __text__
-        if (part.startsWith('__') && part.endsWith('__')) {
-        return (
-            <strong key={index} className="font-bold">
-            {part.slice(2, -2)}
-            </strong>
-        );
-        }
-        
-        // 기울임 *text*
-        if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-        return (
-            <em key={index} className="italic">
-            {part.slice(1, -1)}
-            </em>
-        );
-        }
-        
-        // 기울임 _text_
-        if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
-        return (
-            <em key={index} className="italic">
-            {part.slice(1, -1)}
-            </em>
-        );
-        }
-        
-        return part;
-      });
-    };
 
   // 이미지 파일을 base64로 변환
   const convertToBase64 = (file) => {
@@ -774,35 +625,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* 이미지 모달 */}
-      {imageModalOpen && selectedImage && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
-          onClick={() => {
-            setImageModalOpen(false);
-            setSelectedImage(null);
-          }}
-        >
-          <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
-            <button
-              onClick={() => {
-                setImageModalOpen(false);
-                setSelectedImage(null);
-              }}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2 z-10"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[90vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
-
       {/* 왼쪽 달력 영역 */}
       <div className="w-full md:w-[400px] flex-shrink-0 p-6 bg-white shadow-lg relative">
         <div className="w-full">
@@ -961,12 +783,12 @@ useEffect(() => {
 
           {/* 글 작성 영역 */}
           {isWriting && user && (
-            <div className="flex-1 flex flex-col mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
+            <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="오늘 있었던 일을 기록해보세요..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
                 autoFocus
               />
 
@@ -1044,69 +866,62 @@ useEffect(() => {
                 {filteredPosts.map((post) => (
                   <div key={post.id} className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     {editingId === post.id ? (
-                      <div className="p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
+                      <div className="space-y-3">
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap font-mono"
                           autoFocus
                         />
 
                         {/* 수정 중 이미지 미리보기 */}
                         {editImages.length > 0 && (
-                          <div className="mb-3">
-                            <div className="grid grid-cols-2 gap-2">
-                              {editImages.map((image) => (
-                                <div key={image.id} className="relative">
-                                  <img
-                                    src={image.data}
-                                    alt={image.name}
-                                    className="w-full h-32 object-cover rounded border mx-auto"
-                                  />
-                                  <button
-                                    onClick={() => removeImage(image.id, true)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {editImages.map((image) => (
+                              <div key={image.id} className="relative">
+                                <img
+                                  src={image.data}
+                                  alt={image.name}
+                                  className="w-full h-32 object-cover rounded border mx-aut"
+                                />
+                                <button
+                                  onClick={() => removeImage(image.id, true)}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
 
-                        {/* 수정 중 이미지 추가 버튼 */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors">
-                            <Image className="w-4 h-4" />
-                            <span>image</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={async (e) => {
-                                const files = Array.from(e.target.files);
-                                const imagePromises = files.map(async (file) => {
-                                  if (file.type.startsWith('image/')) {
-                                    const base64 = await convertToBase64(file);
-                                    return {
-                                      id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-                                      name: file.name,
-                                      data: base64
-                                    };
-                                  }
-                                  return null;
-                                });
-                                const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
-                                setEditImages(prev => [...prev, ...newImages]);
-                              }}
-                              className="hidden"
-                            />
-                          </label>
-                          <span className="text-xs text-gray-400">
-                            {editImages.length > 0 && `${editImages.length} image(s) added`}
-                          </span>
-                        </div>
+                        {/* 수정 중 이미지 추가 */}
+                        <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
+                          <Image className="w-4 h-4" />
+                          <span>add image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files);
+                              const imagePromises = files.map(async (file) => {
+                                if (file.type.startsWith('image/')) {
+                                  const base64 = await convertToBase64(file);
+                                  return {
+                                    id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                                    name: file.name,
+                                    data: base64
+                                  };
+                                }
+                                return null;
+                              });
+                              const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
+                              setEditImages(prev => [...prev, ...newImages]);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
 
                         <div className="flex gap-2">
                           <button
@@ -1134,7 +949,7 @@ useEffect(() => {
                           <div className="flex-1">
                             {/* 텍스트 표시 - 마크다운과 줄바꿈 적용 */}
                             <div
-                              className="text-gray-800 leading-relaxed whitespace-pre-wrap"
+                              className="text-gray-800 leading-relaxed"
                               style={{
                                 ...(!expandedPosts.has(post.id) && post.content.length > 200 && {
                                   display: '-webkit-box',
@@ -1144,7 +959,43 @@ useEffect(() => {
                                 })
                               }}
                             >
-                              {renderMarkdownText(post.content)}
+                              <ReactMarkdown
+                                components={{
+                                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 mt-4 mb-2" {...props} />,
+                                  h2: ({node, ...props}) => <h2 className="text-xl font-bold text-gray-900 mt-4 mb-2" {...props} />,
+                                  h3: ({node, ...props}) => <h3 className="text-lg font-bold text-gray-900 mt-4 mb-2" {...props} />,
+                                  p: ({node, ...props}) => <p className="text-gray-800 leading-relaxed mb-2" {...props} />,
+                                  ul: ({node, ...props}) => <ul className="ml-4 list-disc text-gray-800" {...props} />,
+                                  ol: ({node, ...props}) => <ol className="ml-4 list-decimal text-gray-800" {...props} />,
+                                  li: ({node, ...props}) => <li className="text-gray-800" {...props} />,
+                                  a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                                  strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                                  em: ({node, ...props}) => <em className="italic" {...props} />,
+                                  text: ({node, ...props}) => {
+                                    const text = props.children;
+                                    if (typeof text === 'string') {
+                                      const parts = text.split(/(#[\w가-힣]+)/g);
+                                      return (
+                                        <>
+                                          {parts.map((part, index) => {
+                                            if (part.match(/^#[\w가-힣]+$/)) {
+                                              return (
+                                                <span key={index} className="text-blue-600 font-medium">
+                                                  {part}
+                                                </span>
+                                              );
+                                            }
+                                            return <span key={index}>{part}</span>;
+                                          })}
+                                        </>
+                                      );
+                                    }
+                                    return <>{text}</>;
+                                  },
+                                }}
+                              >
+                                {post.content}
+                              </ReactMarkdown>
                             </div>
 
                             {/* 검색/태그 필터링 시 날짜 표시 */}
@@ -1186,10 +1037,7 @@ useEffect(() => {
                                       src={image.url || image.data}
                                       alt={image.name}
                                       className="max-w-full h-auto rounded border cursor-pointer hover:opacity-90 transition-opacity mx-auto"
-                                      onClick={() => {
-                                        setSelectedImage(image.url || image.data);
-                                        setImageModalOpen(true);
-                                      }}
+                                      onClick={() => window.open(image.url || image.data, '_blank')}
                                     />
                                   </div>
                                 ))}
@@ -1202,10 +1050,7 @@ useEffect(() => {
                                     src={post.images[0].data}
                                     alt={post.images[0].name}
                                     className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => {
-                                      setSelectedImage(post.images[0].data);
-                                      setImageModalOpen(true);
-                                    }}
+                                    onClick={() => window.open(post.images[0].data, '_blank')}
                                   />
                                   {post.images.length > 1 && (
                                     <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
