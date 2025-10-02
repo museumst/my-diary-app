@@ -366,95 +366,48 @@ useEffect(() => {
   };
 
   // 인라인 마크다운 처리
-// 인라인 마크다운 처리
-// 인라인 마크다운 처리
-    const processInlineMarkdown = (text) => {
-    // 마크다운 링크와 URL을 모두 감지
-    const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s]+)/g);
+  const processInlineMarkdown = (text) => {
+    const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g);
     
     return parts.map((part, index) => {
-        // undefined나 빈 문자열 건너뛰기
-        if (!part) return null;
-        
-        // 마크다운 링크 [텍스트](URL) 처리
-        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (linkMatch) {
+      if (part.match(/^#[\w가-힣]+$/)) {
         return (
-            <a 
-            key={index} 
-            href={linkMatch[2]} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
-            {linkMatch[1]}
-            </a>
-        );
-        }
-        
-        // 일반 URL (http:// 또는 https://) 처리
-        if (part.match(/^https?:\/\/[^\s]+$/)) {
-        return (
-            <a 
-            key={index} 
-            href={part} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
+          <span key={index} className="text-blue-600 font-medium">
             {part}
-            </a>
+          </span>
         );
-        }
-        
-        // 해시태그
-        if (part.match(/^#[\w가-힣]+$/)) {
+      }
+      if (part.startsWith('**') && part.endsWith('**')) {
         return (
-            <span key={index} className="text-blue-600 font-medium">
-            {part}
-            </span>
-        );
-        }
-        
-        // 굵게 **text**
-        if (part.startsWith('**') && part.endsWith('**')) {
-        return (
-            <strong key={index} className="font-bold">
+          <strong key={index} className="font-bold">
             {part.slice(2, -2)}
-            </strong>
+          </strong>
         );
-        }
-        
-        // 굵게 __text__
-        if (part.startsWith('__') && part.endsWith('__')) {
+      }
+      if (part.startsWith('__') && part.endsWith('__')) {
         return (
-            <strong key={index} className="font-bold">
+          <strong key={index} className="font-bold">
             {part.slice(2, -2)}
-            </strong>
+          </strong>
         );
-        }
-        
-        // 기울임 *text*
-        if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+      }
+      if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
         return (
-            <em key={index} className="italic">
+          <em key={index} className="italic">
             {part.slice(1, -1)}
-            </em>
+          </em>
         );
-        }
-        
-        // 기울임 _text_
-        if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
+      }
+      if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
         return (
-            <em key={index} className="italic">
+          <em key={index} className="italic">
             {part.slice(1, -1)}
-            </em>
+          </em>
         );
-        }
-        
-        return part;
-      });
-    };
+      }
+      return part;
+    });
+  };
 
   // 이미지 파일을 base64로 변환
   const convertToBase64 = (file) => {
@@ -673,7 +626,7 @@ useEffect(() => {
   }) : '기록';
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50">
       {/* 로그인 모달 */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -753,7 +706,7 @@ useEffect(() => {
                   }}
                   className="text-sm text-blue-500 hover:text-blue-600"
                 >
-                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : ' '}
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
                 </button>
               </div>
             </div>
@@ -762,7 +715,7 @@ useEffect(() => {
       )}
 
       {/* 왼쪽 달력 영역 */}
-      <div className="w-full md:w-[400px] flex-shrink-0 p-6 bg-white shadow-lg relative">
+      <div className="w-[400px] flex-shrink-0 p-6 bg-white shadow-lg">
         <div className="w-full">
           {/* 달력 헤더 */}
           <div className="flex items-center justify-between mb-6">
@@ -828,9 +781,16 @@ useEffect(() => {
                 }
               }}
               placeholder="검색..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 focus:outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black"
             />
-            
+            {searchKeyword.trim() && (
+              <button
+                onClick={() => setSearchKeyword('')}
+                className="mt-1 text-xs text-gray-500 hover:text-black"
+              >
+                검색 지우기
+              </button>
+            )}
           </div>
 
 
@@ -868,15 +828,11 @@ useEffect(() => {
               )}
             </div>
           )}
-          {/* 저작권 표시 추가 */}
-          <div className="absolute bottom-0 left-0 right-0 text-xs text-gray-700 text-center pb-[1em]">
-            © 2025 ASHOSHO. All rights reserved.
-          </div>
         </div>
       </div>
 
       {/* 오른쪽 글 목록 영역 */}
-      <div className="flex-1 p-6 bg-gray-50 overflow-y-auto">
+      <div className="flex-1 p-6 bg-gray-50">
         <div className="h-full flex flex-col">
           {/* 헤더 */}
           <div className="flex items-center justify-between mb-6">
@@ -894,29 +850,37 @@ useEffect(() => {
               )}
             </div>
             <div className="flex gap-2">
-                <button
-                    onClick={handleWrite}
-                    className={`
-                    px-3 py-1 text-sm font-medium transition-all duration-200
-                    ${!user
-                        ? 'bg-black text-white border border-black hover:bg-black'
-                        : isWriting
-                        ? 'bg-black text-white hover:bg-gray-800'
-                        : 'bg-black text-white hover:bg-gray-800'
-                    }
-                    `}
-                >
-                    {isWriting ? 'done' : '+'}
-                </button>
+              <button
+                onClick={handleWrite}
+                className={`
+                  px-3 py-1 text-sm font-medium transition-all duration-200 text-white
+                  ${!user
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : isWriting
+                      ? 'bg-black hover:bg-gray-800'
+                      : 'bg-black hover:bg-gray-800'
+                  }
+                `}
+                title={!user ? '로그인이 필요합니다' : ''}
+              >
+                {isWriting ? 'done' : '+'}
+              </button>
 
-                {user && (
-                    <button
-                    onClick={handleLogout}
-                    className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
-                    >
-                    logout
-                    </button>
-                )}
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  logout
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  login
+                </button>
+              )}
             </div>
           </div>
 
@@ -927,7 +891,7 @@ useEffect(() => {
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="오늘 있었던 일을 기록해보세요..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono"
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                 autoFocus
               />
 
@@ -1009,7 +973,7 @@ useEffect(() => {
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap font-mono"
+                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
 
@@ -1088,7 +1052,7 @@ useEffect(() => {
                           <div className="flex-1">
                             {/* 텍스트 표시 - 마크다운과 줄바꿈 적용 */}
                             <div
-                              className="text-gray-800 leading-relaxed whitespace-pre-wrap"
+                              className="text-gray-800 leading-relaxed"
                               style={{
                                 ...(!expandedPosts.has(post.id) && post.content.length > 200 && {
                                   display: '-webkit-box',
@@ -1137,10 +1101,17 @@ useEffect(() => {
                                 {post.images.map((image, index) => (
                                   <div key={image.id} className="mb-4 w-full">
                                     <img
-                                      src={image.url || image.data}
+                                      src={image.data}
                                       alt={image.name}
-                                      className="max-w-full h-auto rounded border cursor-pointer hover:opacity-90 transition-opacity mx-auto"
-                                      onClick={() => window.open(image.url || image.data, '_blank')}
+                                      className="block w-auto max-w-none rounded border cursor-pointer hover:opacity-90 transition-opacity  mx-auto"
+                                      style={{
+                                        display: 'block',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        maxWidth: 'none',
+                                        maxHeight: 'none'
+                                      }}
+                                      onClick={() => window.open(image.data, '_blank')}
                                     />
                                   </div>
                                 ))}
