@@ -868,10 +868,7 @@ useEffect(() => {
               )}
             </div>
           )}
-          {/* 저작권 표시 추가 */}
-          <div className="absolute bottom-0 left-0 right-0 text-xs text-gray-700 text-center pb-[1em]">
-            © 2025 ASHOSHO. All rights reserved.
-          </div>
+         
         </div>
       </div>
 
@@ -1186,6 +1183,10 @@ useEffect(() => {
               </div>
             )}
           </div>
+        </div>
+        {/* 저작권 표시 추가 */}
+          <div className="mt-6 text-xs text-gray-400 text-center">
+            © 2025 ASHOSHO. All rights reserved.
         </div>
       </div>
     </div>
