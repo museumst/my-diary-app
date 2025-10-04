@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
-// 외부 서비스 파일 참조 유지 (컴파일 오류 예상 지점)
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
 import {  
   addPostToDate, 
   updatePostInDate, 
   deletePostFromDate, 
-  subscribeToAllPosts
+  subscribeToAllPosts 
 } from './services/firestoreService';
 
 const DiaryBoard = () => {
@@ -22,70 +22,68 @@ const DiaryBoard = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
-  // 1단계: searchKeyword state 추가
-  const [searchKeyword, setSearchKeyword] = useState('');
   const [expandedPosts, setExpandedPosts] = useState(new Set());
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  
-  // ESC 키로 이미지 모달 닫기
+
+  // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
-    const handleEscKey = (e) => {
-      if (e.key === 'Escape' && imageModalOpen) {
-        setImageModalOpen(false);
-        setSelectedImage(null);
+    try {
+      const unsubscribe = subscribeToAuthState((user) => {
+        setUser(user);
+        setFirebaseConnected(true);
+        if (user) {
+          setIsLoginModalOpen(false);
+          setLoginError('');
+          setLoginForm({ email: '', password: '' });
+        }
+        // 비로그인 시에도 글을 보여주기 위해 setPosts({}) 로직 제거
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.log('Firebase 연결 실패, 데모 모드로 실행');
+      setFirebaseConnected(false);
+      const savedUser = localStorage.getItem('diary_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
       }
-    };
-    
-    window.addEventListener('keydown', handleEscKey);
-    return () => window.removeEventListener('keydown', handleEscKey);
-  }, [imageModalOpen]);
-
-useEffect(() => {
-  try {
-    // 외부 서비스 함수 사용 유지
-    const unsubscribe = subscribeToAuthState((user) => {
-      setUser(user);
-      setFirebaseConnected(true);
-      if (user) {
-        setIsLoginModalOpen(false);
-        setLoginError('');
-        setLoginForm({ email: '', password: '' });
-      }
-    });
-    return () => unsubscribe();
-  } catch (error) {
-    console.log('Firebase 연결 실패, 데모 모드로 실행');
-    setFirebaseConnected(false);
-    const savedUser = localStorage.getItem('diary_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
     }
-  }
-}, []);
+  }, []);
 
- useEffect(() => {
+  // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
+
+  // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
+useEffect(() => {
+  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
+  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
+
   if (firebaseConnected) {
-    // 외부 서비스 함수 사용 유지
+    // Firebase 연결 시: 모든 글을 구독
     const unsubscribe = subscribeToAllPosts((newPosts) => {
       setPosts(newPosts);
     });
     return () => unsubscribe();
   } else {
-    // localStorage에서 데이터 로드
-    const defaultPosts = localStorage.getItem('diary_posts_default');
-    if (defaultPosts) {
-      setPosts(JSON.parse(defaultPosts));
+    // 데모 모드: localStorage에서 데이터 로드 (기존 로직 유지)
+    if (user) {
+      const userPostsKey = `diary_posts_${user.uid}`;
+      const userPosts = localStorage.getItem(userPostsKey);
+      if (userPosts) {
+        setPosts(JSON.parse(userPosts));
+      }
+    } else {
+      // 비로그인 시에도 기본 데이터 로드 (데모 모드)
+      const defaultPosts = localStorage.getItem('diary_posts_default');
+      if (defaultPosts) {
+        setPosts(JSON.parse(defaultPosts));
+      }
     }
   }
-}, [firebaseConnected]);
-
+}, [user, firebaseConnected]);
 
   // 로그인/회원가입 함수
   const handleLogin = async (email, password) => {
@@ -95,10 +93,8 @@ useEffect(() => {
     try {
       if (firebaseConnected) {
         if (isSignupMode) {
-          // 외부 서비스 함수 사용 유지
           await signupWithEmail(email, password);
         } else {
-          // 외부 서비스 함수 사용 유지
           await loginWithEmail(email, password);
         }
       } else {
@@ -132,7 +128,6 @@ useEffect(() => {
       }
     } catch (error) {
       if (firebaseConnected) {
-        // 외부 서비스 함수 사용 유지
         setLoginError(getErrorMessage(error));
       } else {
         setLoginError(error.message);
@@ -145,7 +140,6 @@ useEffect(() => {
   const handleLogout = async () => {
     try {
       if (firebaseConnected) {
-        // 외부 서비스 함수 사용 유지
         await logout();
       } else {
         localStorage.removeItem('diary_user');
@@ -160,14 +154,20 @@ useEffect(() => {
   };
 
   // 💡 [수정] 데모 모드용 데이터 저장
-  const saveUserPosts = (newPosts) => {
-    if (!firebaseConnected) {
-      // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+const saveUserPosts = (newPosts) => {
+  if (!firebaseConnected) {
+    if (user) {
+      // 로그인한 경우, 사용자별 저장소와 공개 저장소 모두 업데이트
+      const userPostsKey = `diary_posts_${user.uid}`;
+      localStorage.setItem(userPostsKey, JSON.stringify(newPosts));
+      localStorage.setItem('diary_posts_default', JSON.stringify(newPosts)); // 모든 사용자가 볼 수 있는 기본 데이터 업데이트
+    } else {
+      // 비로그인 상태에서 저장 로직은 실행되지 않아야 하지만, 안전을 위해 기본 데이터 업데이트
       localStorage.setItem('diary_posts_default', JSON.stringify(newPosts));
-      setPosts(newPosts);
     }
-  };
-
+    setPosts(newPosts);
+  }
+};
 
   // 글 작성
   const handleWrite = async () => {
@@ -190,8 +190,7 @@ useEffect(() => {
           };
           
           if (firebaseConnected) {
-            // 외부 서비스 함수 사용 유지
-            await addPostToDate(selectedDate, newPostData);
+            await addPostToDate(user.uid, selectedDate, newPostData);
           } else {
             const newPosts = {
               ...posts,
@@ -242,8 +241,7 @@ useEffect(() => {
           content: editText.trim(),
           images: editImages
         };
-        // 외부 서비스 함수 사용 유지
-        await updatePostInDate(editingDate, editingId, updatedData);
+        await updatePostInDate(user.uid, editingDate, editingId, updatedData);
       } else {
         const newPosts = {
           ...posts, 
@@ -276,7 +274,6 @@ useEffect(() => {
     }
 
     // 삭제 확인 경고
-    // IMPORTANT: window.confirm 대신 커스텀 모달 UI를 사용해야 하지만, 현재 구현에 따라 window.confirm 유지
     const isConfirmed = window.confirm('정말 삭제하겠습니까?');
     if (!isConfirmed) return;
 
@@ -285,8 +282,7 @@ useEffect(() => {
     try {
       setIsLoading(true);
       if (firebaseConnected) {
-        // 외부 서비스 함수 사용 유지
-        await deletePostFromDate(targetDate, postId);
+        await deletePostFromDate(user.uid, targetDate, postId);
       } else {
         const dayPosts = posts[targetDate] || [];
         const newDayPosts = dayPosts.filter(p => p.id !== postId);
@@ -380,95 +376,48 @@ useEffect(() => {
   };
 
   // 인라인 마크다운 처리
-// 인라인 마크다운 처리
-// 인라인 마크다운 처리
-    const processInlineMarkdown = (text) => {
-    // 마크다운 링크와 URL을 모두 감지
-    const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s]+)/g);
+  const processInlineMarkdown = (text) => {
+    const parts = text.split(/(#[\w가-힣]+|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g);
     
     return parts.map((part, index) => {
-        // undefined나 빈 문자열 건너뛰기
-        if (!part) return null;
-        
-        // 마크다운 링크 [텍스트](URL) 처리
-        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (linkMatch) {
+      if (part.match(/^#[\w가-힣]+$/)) {
         return (
-            <a 
-            key={index} 
-            href={linkMatch[2]} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
-            {linkMatch[1]}
-            </a>
-        );
-        }
-        
-        // 일반 URL (http:// 또는 https://) 처리
-        if (part.match(/^https?:\/\/[^\s]+$/)) {
-        return (
-            <a 
-            key={index} 
-            href={part} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-            >
+          <span key={index} className="text-blue-600 font-medium">
             {part}
-            </a>
+          </span>
         );
-        }
-        
-        // 해시태그
-        if (part.match(/^#[\w가-힣]+$/)) {
+      }
+      if (part.startsWith('**') && part.endsWith('**')) {
         return (
-            <span key={index} className="text-blue-600 font-medium">
-            {part}
-            </span>
-        );
-        }
-        
-        // 굵게 **text**
-        if (part.startsWith('**') && part.endsWith('**')) {
-        return (
-            <strong key={index} className="font-bold">
+          <strong key={index} className="font-bold">
             {part.slice(2, -2)}
-            </strong>
+          </strong>
         );
-        }
-        
-        // 굵게 __text__
-        if (part.startsWith('__') && part.endsWith('__')) {
+      }
+      if (part.startsWith('__') && part.endsWith('__')) {
         return (
-            <strong key={index} className="font-bold">
+          <strong key={index} className="font-bold">
             {part.slice(2, -2)}
-            </strong>
+          </strong>
         );
-        }
-        
-        // 기울임 *text*
-        if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+      }
+      if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
         return (
-            <em key={index} className="italic">
+          <em key={index} className="italic">
             {part.slice(1, -1)}
-            </em>
+          </em>
         );
-        }
-        
-        // 기울임 _text_
-        if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
+      }
+      if (part.startsWith('_') && part.endsWith('_') && !part.startsWith('__')) {
         return (
-            <em key={index} className="italic">
+          <em key={index} className="italic">
             {part.slice(1, -1)}
-            </em>
+          </em>
         );
-        }
-        
-        return part;
-      });
-    };
+      }
+      return part;
+    });
+  };
 
   // 이미지 파일을 base64로 변환
   const convertToBase64 = (file) => {
@@ -478,86 +427,6 @@ useEffect(() => {
       reader.onload = () => resolve(reader.result);
       reader.onerror = error => reject(error);
     });
-  };
-
-  // 복사-붙여넣기 핸들러
-  const handlePaste = async (event, isEditing = false) => {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-
-    const files = [];
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
-        const file = items[i].getAsFile();
-        if (file) {
-          files.push(file);
-        }
-      }
-    }
-
-    if (files.length > 0) {
-      event.preventDefault();
-      const imagePromises = files.map(async (file) => {
-        const base64 = await convertToBase64(file);
-        return {
-          id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-          name: file.name,
-          data: base64
-        };
-      });
-      
-      const newImages = await Promise.all(imagePromises);
-      
-      if (isEditing) {
-        setEditImages(prev => [...prev, ...newImages]);
-      } else {
-        setNewPostImages(prev => [...prev, ...newImages]);
-      }
-    }
-  };
-
-  // 드래그 오버 핸들러
-  const handleDragOver = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(true);
-  };
-
-  // 드래그 떠남 핸들러
-  const handleDragLeave = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(false);
-  };
-
-  // 드롭 핸들러
-  const handleDrop = async (event, isEditing = false) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(false);
-
-    const files = event.dataTransfer?.files;
-    if (!files || files.length === 0) return;
-
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    if (imageFiles.length === 0) return;
-
-    const imagePromises = imageFiles.map(async (file) => {
-      const base64 = await convertToBase64(file);
-      return {
-        id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-        name: file.name,
-        data: base64
-      };
-    });
-    
-    const newImages = await Promise.all(imagePromises);
-    
-    if (isEditing) {
-      setEditImages(prev => [...prev, ...newImages]);
-    } else {
-      setNewPostImages(prev => [...prev, ...newImages]);
-    }
   };
 
   // 이미지 추가
@@ -607,53 +476,22 @@ useEffect(() => {
     return Array.from(allTags).sort();
   };
 
-  // 2단계: getFilteredPosts 함수 교체 (검색 및 태그 필터링 로직 통합)
+  // 해시태그로 필터링된 글 목록
   const getFilteredPosts = () => {
-    // 1. 검색어가 없는 경우: 날짜별 또는 태그별 필터링
-    if (!searchKeyword.trim()) {
-      const selectedPosts = posts[selectedDate] || [];
-      
-      if (selectedTags.length === 0) {
-        // 날짜 선택 + 태그 필터 없음
-        return selectedPosts;
-      }
-
-      // 날짜 선택 + 태그 필터링
-      const taggedPosts = [];
-      Object.entries(posts).forEach(([date, dayPosts]) => {
-        dayPosts.forEach(post => {
-          const postTags = extractHashtags(post.content);
-          const hasAllSelectedTags = selectedTags.every(selectedTag =>
-            postTags.some(postTag => postTag === selectedTag)
-          );
-          if (hasAllSelectedTags) {
-            taggedPosts.push({
-              ...post,
-              date: date // 검색/태그 필터링 시에는 날짜 정보 추가
-            });
-          }
-        });
-      });
-      return taggedPosts;
+    const selectedPosts = posts[selectedDate] || [];
+    
+    if (selectedTags.length === 0) {
+      return selectedPosts;
     }
 
-    // 2. 검색어가 있는 경우: 전체 글에서 검색
     const allFilteredPosts = [];
     Object.entries(posts).forEach(([date, dayPosts]) => {
       dayPosts.forEach(post => {
-        // 검색어 일치 확인 (대소문자 무시)
-        const contentMatch = post.content.toLowerCase().includes(searchKeyword.toLowerCase());
-
-        // 검색어 일치 + 태그 필터링 적용
-        let tagMatch = true;
-        if (selectedTags.length > 0) {
-          const postTags = extractHashtags(post.content);
-          tagMatch = selectedTags.every(selectedTag =>
-            postTags.some(postTag => postTag === selectedTag)
-          );
-        }
-
-        if (contentMatch && tagMatch) {
+        const postTags = extractHashtags(post.content);
+        const hasAllSelectedTags = selectedTags.every(selectedTag =>
+          postTags.some(postTag => postTag === selectedTag)
+        );
+        if (hasAllSelectedTags) {
           allFilteredPosts.push({
             ...post,
             date: date
@@ -710,64 +548,62 @@ useEffect(() => {
     });
   };
 
-    // 달력 렌더링
-    const renderCalendar = () => {
+  // 달력 렌더링
+  const renderCalendar = () => {
     const daysInMonth = getDaysInMonth(currentMonth.year, currentMonth.month);
     const firstDay = getFirstDayOfMonth(currentMonth.year, currentMonth.month);
     const days = [];
 
     for (let i = 0; i < firstDay; i++) {
-        days.push(<div key={`empty-${i}`} className="h-10"></div>);
+      days.push(<div key={`empty-${i}`} className="h-10"></div>);
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = formatDate(currentMonth.year, currentMonth.month, day);
-        const hasPost = posts[dateStr] && posts[dateStr].length > 0;
-        const isSelected = dateStr === selectedDate;
-        const isToday = dateStr === new Date().toISOString().split('T')[0];
+      const dateStr = formatDate(currentMonth.year, currentMonth.month, day);
+      const hasPost = posts[dateStr] && posts[dateStr].length > 0;
+      const isSelected = dateStr === selectedDate;
+      const isToday = dateStr === new Date().toISOString().split('T')[0];
 
-        days.push(
+      days.push(
         <button
-            key={day}
-            onClick={() => {
-            setSelectedDate(dateStr);
-            setSearchKeyword('');
-            }}
-            className={`
+          key={day}
+          onClick={() => setSelectedDate(dateStr)}
+          className={`
             h-10 w-10 text-sm font-medium transition-all duration-200 relative
             ${isSelected
-                ? 'bg-black text-white'
-                : isToday
+              ? 'bg-black text-white'
+              : isToday
                 ? 'bg-gray-100 text-black hover:bg-gray-200'
                 : 'hover:bg-gray-50'
             }
-            `}
+          `}
         >
-            {hasPost && (
+          {hasPost && (
             <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-black rounded-full"></div>
-            )}
-            {day}
+          )}
+          {day}
         </button>
-        );
+      );
     }
 
     return days;
-    };
+  };
 
   const monthNames = [
     '1월', '2월', '3월', '4월', '5월', '6월',
     '7월', '8월', '9월', '10월', '11월', '12월'
   ];
 
+  const selectedPosts = posts[selectedDate] || [];
   const filteredPosts = getFilteredPosts();
-  const formattedSelectedDate = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('ko-KR', {
+  const formattedSelectedDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
-  }) : '기록';
+  });
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50">
       {/* 로그인 모달 */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -847,7 +683,7 @@ useEffect(() => {
                   }}
                   className="text-sm text-blue-500 hover:text-blue-600"
                 >
-                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : ' '}
+                  {isSignupMode ? '이미 계정이 있으신가요? 로그인' : ''}
                 </button>
               </div>
             </div>
@@ -855,37 +691,8 @@ useEffect(() => {
         </div>
       )}
 
-      {/* 이미지 모달 */}
-      {imageModalOpen && selectedImage && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
-          onClick={() => {
-            setImageModalOpen(false);
-            setSelectedImage(null);
-          }}
-        >
-          <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
-            <button
-              onClick={() => {
-                setImageModalOpen(false);
-                setSelectedImage(null);
-              }}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2 z-10"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[90vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
-
       {/* 왼쪽 달력 영역 */}
-      <div className="w-full md:w-[400px] flex-shrink-0 p-6 bg-white shadow-lg relative">
+      <div className="w-[400px] flex-shrink-0 p-6 bg-white shadow-lg">
         <div className="w-full">
           {/* 달력 헤더 */}
           <div className="flex items-center justify-between mb-6">
@@ -936,26 +743,6 @@ useEffect(() => {
           <div className="grid grid-cols-7 gap-1">
             {renderCalendar()}
           </div>
-          
-          {/* 3단계: 검색창 추가 */}
-          {/* 검색창 */}
-          <div className="mt-6">
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => {
-                setSearchKeyword(e.target.value);
-                // 검색 시작 시 날짜 선택을 해제하여 전체 검색 결과를 보여줌
-                if (e.target.value.trim() && selectedTags.length === 0) {
-                   setSelectedDate(null); // 날짜 선택 상태 해제
-                }
-              }}
-              placeholder="검색..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 focus:outline-none"
-            />
-            
-          </div>
-
 
           {/* 해시태그 목록 */}
           {getAllHashtags().length > 0 && (
@@ -978,82 +765,77 @@ useEffect(() => {
                   </button>
                 ))}
               </div>
-              {(selectedTags.length > 0 || searchKeyword.trim()) && (
+              {selectedTags.length > 0 && (
                 <button
-                  onClick={() => {
-                    setSelectedTags([]);
-                    setSearchKeyword('');
-                  }}
+                  onClick={() => setSelectedTags([])}
                   className="mt-2 text-xs text-gray-500 hover:text-black transition-colors"
                 >
-                  모든 필터 해제
+                  clear filter
                 </button>
               )}
             </div>
           )}
-         
         </div>
       </div>
 
       {/* 오른쪽 글 목록 영역 */}
-      <div className="flex-1 p-6 bg-gray-50 overflow-y-auto">
+      <div className="flex-1 p-6 bg-gray-50">
         <div className="h-full flex flex-col">
           {/* 헤더 */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              {/* 4단계: 헤더 수정 */}
               <h3 className="text-xl font-bold text-gray-800">
-                {searchKeyword.trim() ? `"${searchKeyword.trim()}" 검색 결과` : 
-                 selectedTags.length > 0 ? '태그 필터링 결과' : 
-                 formattedSelectedDate}
+                {selectedTags.length > 0 ? 'Tagged Posts' : formattedSelectedDate}
               </h3>
               {selectedTags.length > 0 && (
                 <div className="text-sm text-gray-500 mt-1">
-                  태그 필터링: {selectedTags.join(' ')}
+                  filtering by: {selectedTags.join(' ')}
                 </div>
               )}
             </div>
             <div className="flex gap-2">
-                <button
-                    onClick={handleWrite}
-                    className={`
-                    px-3 py-1 text-sm font-medium transition-all duration-200
-                    ${!user
-                        ? 'bg-black text-white border border-black hover:bg-black'
-                        : isWriting
-                        ? 'bg-black text-white hover:bg-gray-800'
-                        : 'bg-black text-white hover:bg-gray-800'
-                    }
-                    `}
-                >
-                    {isWriting ? 'done' : '+'}
-                </button>
+              <button
+                onClick={handleWrite}
+                className={`
+                  px-3 py-1 text-sm font-medium transition-all duration-200 text-white
+                  ${!user
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : isWriting
+                      ? 'bg-black hover:bg-gray-800'
+                      : 'bg-black hover:bg-gray-800'
+                  }
+                `}
+                title={!user ? '로그인이 필요합니다' : ''}
+              >
+                {isWriting ? 'done' : '+'}
+              </button>
 
-                {user && (
-                    <button
-                    onClick={handleLogout}
-                    className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
-                    >
-                    logout
-                    </button>
-                )}
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  logout
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-3 py-1 text-sm font-medium bg-black hover:bg-gray-800 text-white transition-all duration-200"
+                >
+                  login
+                </button>
+              )}
             </div>
           </div>
 
           {/* 글 작성 영역 */}
           {isWriting && user && (
-            <div className="flex-1 flex flex-col mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
+            <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
-                onPaste={(e) => handlePaste(e, false)}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, false)}
-                placeholder="오늘 있었던 일을 기록해보세요... (이미지를 복사-붙여넣기하거나 드래그할 수 있습니다)"
-                className={`w-full h-32 p-3 border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono transition-colors ${
-                  isDragging ? 'border-blue-500 border-2 bg-blue-50' : 'border-gray-300'
-                }`}
+                placeholder="오늘 있었던 일을 기록해보세요..."
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                 autoFocus
               />
 
@@ -1066,7 +848,7 @@ useEffect(() => {
                         <img
                           src={image.data}
                           alt={image.name}
-                          className="w-full h-32 object-cover rounded border mx-auto"
+                          className="w-full h-32 object-cover rounded border"
                         />
                         <button
                           onClick={() => removeImage(image.id)}
@@ -1105,102 +887,94 @@ useEffect(() => {
             {filteredPosts.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                {searchKeyword.trim() ? (
+                {selectedTags.length > 0 ? (
+                  selectedPosts.length === 0 ? (
+                    <>
+                      <p>이 날에는 작성된 글이 없습니다.</p>
+                      {user ? (
+                        <p className="text-sm">+ 버튼을 눌러 새 글을 작성해보세요.</p>
+                      ) : (
+                        <p className="text-sm">다른 날짜의 글을 보거나 로그인하여 작성해보세요.</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p>선택한 태그와 일치하는 글이 없습니다.</p>
+                      <p className="text-sm">다른 태그를 선택하거나 필터를 해제해보세요.</p>
+                    </>
+                  )
+                ) : selectedPosts.length === 0 ? (
                   <>
-                    <p>"{searchKeyword.trim()}"에 대한 검색 결과가 없습니다.</p>
-                    <p className="text-sm">다른 검색어를 시도해 보세요.</p>
-                  </>
-                ) : selectedTags.length > 0 ? (
-                  <>
-                    <p>선택한 태그와 일치하는 글이 없습니다.</p>
-                    <p className="text-sm">다른 태그를 선택하거나 필터를 해제해보세요.</p>
-                  </>
-                ) : (
-                  <>
-                    <p>{formattedSelectedDate}에 작성된 글이 없습니다.</p>
+                    <p>이 날에는 작성된 글이 없습니다.</p>
                     {user ? (
                       <p className="text-sm">+ 버튼을 눌러 새 글을 작성해보세요.</p>
                     ) : (
                       <p className="text-sm">다른 날짜의 글을 보거나 로그인하여 작성해보세요.</p>
                     )}
                   </>
-                )}
+                ) : null}
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredPosts.map((post) => (
                   <div key={post.id} className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     {editingId === post.id ? (
-                      <div className="p-4 bg-white rounded-lg shadow-sm border-2 border-blue-200">
+                      <div className="space-y-3">
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          onPaste={(e) => handlePaste(e, true)}
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, true)}
-                          placeholder="내용을 수정하세요... (이미지를 복사-붙여넣기하거나 드래그할 수 있습니다)"
-                          className={`w-full h-32 p-3 border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 whitespace-pre-wrap font-mono transition-colors ${
-                            isDragging ? 'border-blue-500 border-2 bg-blue-50' : 'border-gray-300'
-                          }`}
+                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
 
                         {/* 수정 중 이미지 미리보기 */}
                         {editImages.length > 0 && (
-                          <div className="mb-3">
-                            <div className="grid grid-cols-2 gap-2">
-                              {editImages.map((image) => (
-                                <div key={image.id} className="relative">
-                                  <img
-                                    src={image.data}
-                                    alt={image.name}
-                                    className="w-full h-32 object-cover rounded border mx-auto"
-                                  />
-                                  <button
-                                    onClick={() => removeImage(image.id, true)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {editImages.map((image) => (
+                              <div key={image.id} className="relative">
+                                <img
+                                  src={image.data}
+                                  alt={image.name}
+                                  className="w-full h-32 object-cover rounded border"
+                                />
+                                <button
+                                  onClick={() => removeImage(image.id, true)}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
 
-                        {/* 수정 중 이미지 추가 버튼 */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors">
-                            <Image className="w-4 h-4" />
-                            <span>image</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={async (e) => {
-                                const files = Array.from(e.target.files);
-                                const imagePromises = files.map(async (file) => {
-                                  if (file.type.startsWith('image/')) {
-                                    const base64 = await convertToBase64(file);
-                                    return {
-                                      id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-                                      name: file.name,
-                                      data: base64
-                                    };
-                                  }
-                                  return null;
-                                });
-                                const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
-                                setEditImages(prev => [...prev, ...newImages]);
-                              }}
-                              className="hidden"
-                            />
-                          </label>
-                          <span className="text-xs text-gray-400">
-                            {editImages.length > 0 && `${editImages.length} image(s) added`}
-                          </span>
-                        </div>
+                        {/* 수정 중 이미지 추가 */}
+                        <label className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-black cursor-pointer transition-colors w-fit">
+                          <Image className="w-4 h-4" />
+                          <span>add image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files);
+                              const imagePromises = files.map(async (file) => {
+                                if (file.type.startsWith('image/')) {
+                                  const base64 = await convertToBase64(file);
+                                  return {
+                                    id: `img_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                                    name: file.name,
+                                    data: base64
+                                  };
+                                }
+                                return null;
+                              });
+                              const newImages = (await Promise.all(imagePromises)).filter(img => img !== null);
+                              setEditImages(prev => [...prev, ...newImages]);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
 
                         <div className="flex gap-2">
                           <button
@@ -1228,7 +1002,7 @@ useEffect(() => {
                           <div className="flex-1">
                             {/* 텍스트 표시 - 마크다운과 줄바꿈 적용 */}
                             <div
-                              className="text-gray-800 leading-relaxed whitespace-pre-wrap"
+                              className="text-gray-800 leading-relaxed"
                               style={{
                                 ...(!expandedPosts.has(post.id) && post.content.length > 200 && {
                                   display: '-webkit-box',
@@ -1241,8 +1015,8 @@ useEffect(() => {
                               {renderMarkdownText(post.content)}
                             </div>
 
-                            {/* 검색/태그 필터링 시 날짜 표시 */}
-                            {(searchKeyword.trim() || selectedTags.length > 0) && post.date && (
+                            {/* 태그 필터링 시 날짜 표시 */}
+                            {selectedTags.length > 0 && post.date && (
                               <p className="text-xs text-gray-400 mt-1">
                                 {new Date(post.date + 'T00:00:00').toLocaleDateString('ko-KR')}
                               </p>
@@ -1277,13 +1051,17 @@ useEffect(() => {
                                 {post.images.map((image, index) => (
                                   <div key={image.id} className="mb-4 w-full">
                                     <img
-                                      src={image.url || image.data}
+                                      src={image.data}
                                       alt={image.name}
-                                      className="max-w-full h-auto rounded border cursor-pointer hover:opacity-90 transition-opacity mx-auto"
-                                      onClick={() => {
-                                        setSelectedImage(image.url || image.data);
-                                        setImageModalOpen(true);
+                                      className="block w-auto max-w-none rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                                      style={{
+                                        display: 'block',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        maxWidth: 'none',
+                                        maxHeight: 'none'
                                       }}
+                                      onClick={() => window.open(image.data, '_blank')}
                                     />
                                   </div>
                                 ))}
@@ -1296,10 +1074,7 @@ useEffect(() => {
                                     src={post.images[0].data}
                                     alt={post.images[0].name}
                                     className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => {
-                                      setSelectedImage(post.images[0].data);
-                                      setImageModalOpen(true);
-                                    }}
+                                    onClick={() => window.open(post.images[0].data, '_blank')}
                                   />
                                   {post.images.length > 1 && (
                                     <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
@@ -1324,7 +1099,14 @@ useEffect(() => {
                           </div>
                         )}
 
-                        
+                        <div className="flex items-center justify-between mt-2">
+                          <Link 
+                            to={`/post/${post.date || selectedDate}/${post.id}`}
+                            className="text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                          >
+                            {post.createdAt}
+                          </Link>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1332,10 +1114,6 @@ useEffect(() => {
               </div>
             )}
           </div>
-        </div>
-        {/* 저작권 표시 추가 */}
-          <div className="mt-6 text-xs text-gray-400 text-center">
-            © 2025 ASHOSHO. All rights reserved.
         </div>
       </div>
     </div>
