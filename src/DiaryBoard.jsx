@@ -184,7 +184,7 @@ const saveUserPosts = (newPosts) => {
           };
           
           if (firebaseConnected) {
-            await addPostToDate(user.uid, selectedDate, newPostData);
+            await addPostToDate(selectedDate, newPostData);
           } else {
             const newPosts = {
               ...posts,
@@ -235,7 +235,7 @@ const saveUserPosts = (newPosts) => {
           content: editText.trim(),
           images: editImages
         };
-        await updatePostInDate(user.uid, editingDate, editingId, updatedData);
+        await updatePostInDate(editingDate, editingId, updatedData);
       } else {
         const newPosts = {
           ...posts, 
@@ -276,7 +276,7 @@ const saveUserPosts = (newPosts) => {
     try {
       setIsLoading(true);
       if (firebaseConnected) {
-        await deletePostFromDate(user.uid, targetDate, postId);
+        await deletePostFromDate(targetDate, postId);
       } else {
         const dayPosts = posts[targetDate] || [];
         const newDayPosts = dayPosts.filter(p => p.id !== postId);
