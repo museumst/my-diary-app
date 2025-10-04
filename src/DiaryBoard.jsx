@@ -53,15 +53,9 @@ const DiaryBoard = () => {
     }
   }, []);
 
-  // 💡 [수정] 사용자별 또는 공개 데이터 실시간 구독/로드
-
-  // 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
-  // 사용자별 실시간 데이터 리스너 (Firebase 연결 시)
-useEffect(() => {
-  // 🚨 관리자(공개) 계정의 UID를 설정합니다. 이 UID의 게시물만 공개됩니다.
-  const publicViewingUID = "iheQe0Z0UWhN0IVU00Lwip1EWsr2"; // 👈 이 부분을 복사한 UID로 설정하세요.
-
-  if (firebaseConnected) {
+  // 사용자별 또는 공개 데이터 실시간 구독/로드
+  useEffect(() => {
+    if (firebaseConnected) {
     // Firebase 연결 시: 모든 글을 구독
     const unsubscribe = subscribeToAllPosts((newPosts) => {
       setPosts(newPosts);
