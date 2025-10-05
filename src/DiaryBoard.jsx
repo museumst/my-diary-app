@@ -829,7 +829,7 @@ const saveUserPosts = (newPosts) => {
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="오늘 있었던 일을 기록해보세요..."
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                className="w-full h-48 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                 autoFocus
               />
 
@@ -917,7 +917,7 @@ const saveUserPosts = (newPosts) => {
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full h-48 p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
 
