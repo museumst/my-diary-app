@@ -1169,13 +1169,15 @@ const saveUserPosts = (newPosts) => {
               </div>
             )}
             
-            {/* Copyright Footer */}
-            <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
-              © 2025 ASHOSHO
-            </div>
+          
           </div>
         </div>
+        {/* Copyright Footer */}
+        <div className="mt-auto pt-1 text-center text-xs text-gray-400">
+          © 2025 Ashosho
+        </div>
       </div>
+      
     </div>
   );
 }
