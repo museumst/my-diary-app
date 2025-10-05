@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Edit3, Check, X, Image, Trash } from 'lucide-react';
+import { Calendar, Edit3, Check, X, Image, Trash, Heart } from 'lucide-react';
 import { subscribeToAuthState, loginWithEmail, signupWithEmail, logout, getErrorMessage } from './services/authService';
 import {  
   addPostToDate, 
@@ -28,6 +28,11 @@ const DiaryBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
+  const [likedPosts, setLikedPosts] = useState(() => {
+    // localStorage에서 좋아요한 글 목록 불러오기
+    const saved = localStorage.getItem('diary_liked_posts');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
@@ -180,7 +185,8 @@ const saveUserPosts = (newPosts) => {
             content: newPost.trim(),
             images: newPostImages,
             createdAt: new Date().toLocaleTimeString(),
-            author: user.email
+            author: user.email,
+            likes: 0
           };
           
           if (firebaseConnected) {
@@ -299,6 +305,50 @@ const saveUserPosts = (newPosts) => {
       setLoginError('글 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 좋아요 처리 함수
+  const handleLike = async (postId, postDate = null) => {
+    const targetDate = postDate || selectedDate;
+    const isLiked = likedPosts.includes(postId);
+    
+    try {
+      const dayPosts = posts[targetDate] || [];
+      const post = dayPosts.find(p => p.id === postId);
+      if (!post) return;
+
+      const newLikeCount = isLiked ? Math.max(0, (post.likes || 0) - 1) : (post.likes || 0) + 1;
+
+      if (firebaseConnected) {
+        // Firebase 모드 - 전체 포스트 데이터를 포함하여 업데이트
+        const updatedData = {
+          ...post,
+          likes: newLikeCount
+        };
+        await updatePostInDate(targetDate, postId, updatedData);
+      } else {
+        // 데모 모드
+        const newPosts = {
+          ...posts,
+          [targetDate]: posts[targetDate].map(p =>
+            p.id === postId
+              ? { ...p, likes: newLikeCount }
+              : p
+          )
+        };
+        saveUserPosts(newPosts);
+      }
+
+      // localStorage에 좋아요 상태 저장
+      const newLikedPosts = isLiked
+        ? likedPosts.filter(id => id !== postId)
+        : [...likedPosts, postId];
+      
+      setLikedPosts(newLikedPosts);
+      localStorage.setItem('diary_liked_posts', JSON.stringify(newLikedPosts));
+    } catch (error) {
+      console.error('Error liking post:', error);
     }
   };
 
@@ -1096,10 +1146,21 @@ const saveUserPosts = (newPosts) => {
                         <div className="flex items-center justify-between mt-2">
                           <Link 
                             to={`/post/${post.date || selectedDate}/${post.id}`}
-                            className="text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                            className="text-xs text-gray-500 hover:text-blue-600 transition-colors break-all"
                           >
-                            {post.createdAt}
+                            https://ashosho.netlify.app/post/{post.date || selectedDate}/{post.id}
                           </Link>
+                          
+                          {/* 좋아요 버튼 */}
+                          <button
+                            onClick={() => handleLike(post.id, post.date)}
+                            className="flex items-center gap-1 text-gray-500 hover:text-red-500 transition-colors flex-shrink-0"
+                          >
+                            <Heart
+                              className={`w-4 h-4 ${likedPosts.includes(post.id) ? 'fill-red-500 text-red-500' : ''}`}
+                            />
+                            <span className="text-xs">{post.likes || 0}</span>
+                          </button>
                         </div>
                       </div>
                     )}
