@@ -473,6 +473,29 @@ const saveUserPosts = (newPosts) => {
     });
   };
 
+  // 이미지를 새 창에서 열기
+  const openImageInNewTab = (imageData) => {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Image</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; }
+              img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+            </style>
+          </head>
+          <body>
+            <img src="${imageData}" alt="Full size image" />
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
+  };
+
   // 이미지 추가
   const handleImageAdd = async (event) => {
     const files = Array.from(event.target.files);
@@ -1105,7 +1128,7 @@ const saveUserPosts = (newPosts) => {
                                         maxWidth: 'none',
                                         maxHeight: 'none'
                                       }}
-                                      onClick={() => window.open(image.data, '_blank')}
+                                      onClick={() => openImageInNewTab(image.data)}
                                     />
                                   </div>
                                 ))}
@@ -1118,7 +1141,7 @@ const saveUserPosts = (newPosts) => {
                                     src={post.images[0].data}
                                     alt={post.images[0].name}
                                     className="max-w-full h-48 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => window.open(post.images[0].data, '_blank')}
+                                    onClick={() => openImageInNewTab(post.images[0].data)}
                                   />
                                   {post.images.length > 1 && (
                                     <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
