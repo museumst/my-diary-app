@@ -647,7 +647,7 @@ const saveUserPosts = (newPosts) => {
   });
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
       {/* 로그인 모달 */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -736,7 +736,7 @@ const saveUserPosts = (newPosts) => {
       )}
 
       {/* 왼쪽 달력 영역 */}
-      <div className="w-[400px] flex-shrink-0 p-6 bg-white shadow-lg">
+      <div className="w-full md:w-[400px] flex-shrink-0 p-6 bg-white shadow-lg">
         <div className="w-full">
           {/* 달력 헤더 */}
           <div className="flex items-center justify-between mb-6">
@@ -927,7 +927,7 @@ const saveUserPosts = (newPosts) => {
           )}
 
           {/* 글 목록 */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pb-4">
             {filteredPosts.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -1168,6 +1168,11 @@ const saveUserPosts = (newPosts) => {
                 ))}
               </div>
             )}
+            
+            {/* Copyright Footer */}
+            <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
+              © 2025 ASHOSHO
+            </div>
           </div>
         </div>
       </div>
