@@ -678,23 +678,23 @@ const saveUserPosts = (newPosts) => {
             setCurrentImage(null);
           }}
         >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setImageModalOpen(false);
-              setCurrentImage(null);
-            }}
-            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10"
-            title="닫기 (ESC)"
-          >
-            <X className="w-8 h-8" />
-          </button>
-          <img
-            src={currentImage}
-            alt="Full size"
-            className="max-w-[90vw] max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => {
+                setImageModalOpen(false);
+                setCurrentImage(null);
+              }}
+              className="absolute -top-2 -right-2 bg-white text-gray-800 rounded-full p-1 hover:bg-gray-200 transition-colors z-10 shadow-lg"
+              title="닫기 (ESC)"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={currentImage}
+              alt="Full size"
+              className="max-w-[90vw] max-h-[90vh] object-contain"
+            />
+          </div>
         </div>
       )}
 
