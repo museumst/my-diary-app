@@ -33,6 +33,8 @@ const DiaryBoard = () => {
     const saved = localStorage.getItem('diary_liked_posts');
     return saved ? JSON.parse(saved) : [];
   });
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [currentImage, setCurrentImage] = useState(null);
 
   // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
@@ -473,28 +475,24 @@ const saveUserPosts = (newPosts) => {
     });
   };
 
-  // 이미지를 새 창에서 열기
+  // 이미지를 모달로 열기
   const openImageInNewTab = (imageData) => {
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Image</title>
-            <style>
-              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; }
-              img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-            </style>
-          </head>
-          <body>
-            <img src="${imageData}" alt="Full size image" />
-          </body>
-        </html>
-      `);
-      newWindow.document.close();
-    }
+    setCurrentImage(imageData);
+    setImageModalOpen(true);
   };
+
+  // ESC 키로 이미지 모달 닫기
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape' && imageModalOpen) {
+        setImageModalOpen(false);
+        setCurrentImage(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, [imageModalOpen]);
 
   // 이미지 추가
   const handleImageAdd = async (event) => {
@@ -671,6 +669,35 @@ const saveUserPosts = (newPosts) => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-50">
+      {/* 이미지 모달 */}
+      {imageModalOpen && currentImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50"
+          onClick={() => {
+            setImageModalOpen(false);
+            setCurrentImage(null);
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setImageModalOpen(false);
+              setCurrentImage(null);
+            }}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10"
+            title="닫기 (ESC)"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img
+            src={currentImage}
+            alt="Full size"
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* 로그인 모달 */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
