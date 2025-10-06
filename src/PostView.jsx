@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar } from 'lucide-react';
+import { ArrowLeft, Calendar, Heart } from 'lucide-react';
 import { subscribeToAuthState } from './services/authService';
-import { subscribeToAllPosts } from './services/firestoreService';
+import { subscribeToAllPosts, updatePostInDate } from './services/firestoreService';
 
 const PostView = () => {
   const { date, postId } = useParams();
@@ -11,6 +11,10 @@ const PostView = () => {
   const [user, setUser] = useState(null);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [likedPosts, setLikedPosts] = useState(() => {
+    const saved = localStorage.getItem('diary_liked_posts');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     try {
@@ -150,6 +154,51 @@ const PostView = () => {
     });
   };
 
+  // 좋아요 처리 함수
+  const handleLike = async (postId) => {
+    const isLiked = likedPosts.includes(postId);
+    
+    if (!post) return;
+
+    const newLikeCount = isLiked ? Math.max(0, (post.likes || 0) - 1) : (post.likes || 0) + 1;
+
+    // 로컬 상태 먼저 업데이트 (즉시 반영)
+    setPost({ ...post, likes: newLikeCount });
+
+    // localStorage에 좋아요 상태 저장
+    const newLikedPosts = isLiked
+      ? likedPosts.filter(id => id !== postId)
+      : [...likedPosts, postId];
+    
+    setLikedPosts(newLikedPosts);
+    localStorage.setItem('diary_liked_posts', JSON.stringify(newLikedPosts));
+
+    // Firebase 업데이트 시도 (실패해도 로컬 상태는 유지)
+    if (firebaseConnected && user) {
+      try {
+        await updatePostInDate(date, postId, { likes: newLikeCount });
+      } catch (error) {
+        console.log('Firebase 업데이트 실패 (로그인 필요), 로컬 상태만 유지:', error);
+      }
+    } else if (!firebaseConnected) {
+      // 데모 모드: localStorage 업데이트
+      const storageKey = user ? `diary_posts_${user.uid}` : 'diary_posts_default';
+      const storedPosts = localStorage.getItem(storageKey);
+      if (storedPosts) {
+        const posts = JSON.parse(storedPosts);
+        const dayPosts = posts[date] || [];
+        const updatedDayPosts = dayPosts.map(p =>
+          p.id === postId ? { ...p, likes: newLikeCount } : p
+        );
+        posts[date] = updatedDayPosts;
+        localStorage.setItem(storageKey, JSON.stringify(posts));
+        
+        // 기본 저장소도 업데이트
+        localStorage.setItem('diary_posts_default', JSON.stringify(posts));
+      }
+    }
+  };
+
   const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -220,12 +269,18 @@ const PostView = () => {
               </div>
             )}
 
-            {/* 작성자 정보 */}
-            {post.author && (
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500">작성자: {post.author}</p>
-              </div>
-            )}
+            {/* 좋아요 버튼 */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => handleLike(post.id)}
+                className="flex items-center gap-2 text-gray-600 hover:text-red-500 transition-colors"
+              >
+                <Heart
+                  className={`w-5 h-5 ${likedPosts.includes(post.id) ? 'fill-red-500 text-red-500' : ''}`}
+                />
+                <span className="text-sm">{post.likes || 0} likes</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

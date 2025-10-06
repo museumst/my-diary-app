@@ -315,42 +315,41 @@ const saveUserPosts = (newPosts) => {
     const targetDate = postDate || selectedDate;
     const isLiked = likedPosts.includes(postId);
     
-    try {
-      const dayPosts = posts[targetDate] || [];
-      const post = dayPosts.find(p => p.id === postId);
-      if (!post) return;
+    const dayPosts = posts[targetDate] || [];
+    const post = dayPosts.find(p => p.id === postId);
+    if (!post) return;
 
-      const newLikeCount = isLiked ? Math.max(0, (post.likes || 0) - 1) : (post.likes || 0) + 1;
+    const newLikeCount = isLiked ? Math.max(0, (post.likes || 0) - 1) : (post.likes || 0) + 1;
 
-      if (firebaseConnected) {
-        // Firebase 모드 - 전체 포스트 데이터를 포함하여 업데이트
-        const updatedData = {
-          ...post,
-          likes: newLikeCount
-        };
-        await updatePostInDate(targetDate, postId, updatedData);
-      } else {
-        // 데모 모드
-        const newPosts = {
-          ...posts,
-          [targetDate]: posts[targetDate].map(p =>
-            p.id === postId
-              ? { ...p, likes: newLikeCount }
-              : p
-          )
-        };
-        saveUserPosts(newPosts);
+    // 로컬 상태 먼저 업데이트 (즉시 반영)
+    const newPosts = {
+      ...posts,
+      [targetDate]: posts[targetDate].map(p =>
+        p.id === postId
+          ? { ...p, likes: newLikeCount }
+          : p
+      )
+    };
+    setPosts(newPosts);
+
+    // localStorage에 좋아요 상태 저장
+    const newLikedPosts = isLiked
+      ? likedPosts.filter(id => id !== postId)
+      : [...likedPosts, postId];
+    
+    setLikedPosts(newLikedPosts);
+    localStorage.setItem('diary_liked_posts', JSON.stringify(newLikedPosts));
+
+    // Firebase 업데이트 시도 (실패해도 로컬 상태는 유지)
+    if (firebaseConnected && user) {
+      try {
+        await updatePostInDate(targetDate, postId, { likes: newLikeCount });
+      } catch (error) {
+        console.log('Firebase 업데이트 실패 (로그인 필요), 로컬 상태만 유지:', error);
       }
-
-      // localStorage에 좋아요 상태 저장
-      const newLikedPosts = isLiked
-        ? likedPosts.filter(id => id !== postId)
-        : [...likedPosts, postId];
-      
-      setLikedPosts(newLikedPosts);
-      localStorage.setItem('diary_liked_posts', JSON.stringify(newLikedPosts));
-    } catch (error) {
-      console.error('Error liking post:', error);
+    } else if (!firebaseConnected) {
+      // 데모 모드에서는 localStorage에도 저장
+      saveUserPosts(newPosts);
     }
   };
 
