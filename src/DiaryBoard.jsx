@@ -35,6 +35,7 @@ const DiaryBoard = () => {
   });
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [currentImage, setCurrentImage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 💡 [수정] Firebase 연결 확인 및 초기 사용자 설정
   useEffect(() => {
@@ -544,27 +545,53 @@ const saveUserPosts = (newPosts) => {
   const getFilteredPosts = () => {
     const selectedPosts = posts[selectedDate] || [];
     
-    if (selectedTags.length === 0) {
-      return selectedPosts;
-    }
-
-    const allFilteredPosts = [];
-    Object.entries(posts).forEach(([date, dayPosts]) => {
-      dayPosts.forEach(post => {
-        const postTags = extractHashtags(post.content);
-        const hasAllSelectedTags = selectedTags.every(selectedTag =>
-          postTags.some(postTag => postTag === selectedTag)
-        );
-        if (hasAllSelectedTags) {
-          allFilteredPosts.push({
+    // 검색어가 있으면 모든 날짜의 글을 대상으로, 없으면 선택된 날짜의 글만
+    let postsToFilter = [];
+    
+    if (searchQuery.trim()) {
+      // 검색어가 있으면 모든 날짜의 글을 검색
+      Object.entries(posts).forEach(([date, dayPosts]) => {
+        dayPosts.forEach(post => {
+          postsToFilter.push({
             ...post,
             date: date
           });
-        }
+        });
       });
-    });
+    } else if (selectedTags.length > 0) {
+      // 검색어는 없지만 태그 필터가 있으면 모든 날짜의 글을 대상으로
+      Object.entries(posts).forEach(([date, dayPosts]) => {
+        dayPosts.forEach(post => {
+          postsToFilter.push({
+            ...post,
+            date: date
+          });
+        });
+      });
+    } else {
+      // 검색어도 태그 필터도 없으면 선택된 날짜의 글만
+      return selectedPosts;
+    }
 
-    return allFilteredPosts;
+    // 해시태그 필터 적용
+    if (selectedTags.length > 0) {
+      postsToFilter = postsToFilter.filter(post => {
+        const postTags = extractHashtags(post.content);
+        return selectedTags.every(selectedTag =>
+          postTags.some(postTag => postTag === selectedTag)
+        );
+      });
+    }
+
+    // 검색어 필터 적용
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      postsToFilter = postsToFilter.filter(post =>
+        post.content.toLowerCase().includes(query)
+      );
+    }
+
+    return postsToFilter;
   };
 
   // 해시태그 선택/해제
@@ -631,7 +658,10 @@ const saveUserPosts = (newPosts) => {
       days.push(
         <button
           key={day}
-          onClick={() => setSelectedDate(dateStr)}
+          onClick={() => {
+            setSelectedDate(dateStr);
+            setSearchQuery(''); // 날짜 클릭 시 검색창 초기화
+          }}
           className={`
             h-10 w-10 text-sm font-medium transition-all duration-200 relative
             ${isSelected
@@ -837,6 +867,28 @@ const saveUserPosts = (newPosts) => {
             {renderCalendar()}
           </div>
 
+          {/* 검색창 */}
+          <div className="mt-6">
+            <div className="text-xs text-gray-500 mb-2">search</div>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search posts..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* 해시태그 목록 */}
           {getAllHashtags().length > 0 && (
             <div className="mt-6">
@@ -878,11 +930,17 @@ const saveUserPosts = (newPosts) => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-gray-800">
-                {selectedTags.length > 0 ? 'Tagged Posts' : formattedSelectedDate}
+                {searchQuery.trim() 
+                  ? 'Search Results' 
+                  : selectedTags.length > 0 
+                    ? 'Tagged Posts' 
+                    : formattedSelectedDate}
               </h3>
-              {selectedTags.length > 0 && (
+              {(searchQuery.trim() || selectedTags.length > 0) && (
                 <div className="text-sm text-gray-500 mt-1">
-                  filtering by: {selectedTags.join(' ')}
+                  {searchQuery.trim() && `searching: "${searchQuery}"`}
+                  {searchQuery.trim() && selectedTags.length > 0 && ' · '}
+                  {selectedTags.length > 0 && `tags: ${selectedTags.join(' ')}`}
                 </div>
               )}
             </div>
@@ -980,7 +1038,12 @@ const saveUserPosts = (newPosts) => {
             {filteredPosts.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                {selectedTags.length > 0 ? (
+                {searchQuery.trim() ? (
+                  <>
+                    <p>검색 결과가 없습니다.</p>
+                    <p className="text-sm">다른 검색어를 입력하거나 필터를 해제해보세요.</p>
+                  </>
+                ) : selectedTags.length > 0 ? (
                   selectedPosts.length === 0 ? (
                     <>
                       <p>이 날에는 작성된 글이 없습니다.</p>
